@@ -92,6 +92,25 @@ All colors MUST be HSL.
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  /* Kitchen dashboard specific colors */
+  :root {
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --kitchen-urgent: 0 84.2% 60.2%;
+    --kitchen-card: 0 0% 98%;
+  }
+
+  .dark {
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 144.9 80.4% 10%;
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --kitchen-urgent: 0 72.2% 50.6%;
+    --kitchen-card: 222.2 84% 4.9%;
+  }
 }
 
 @layer base {

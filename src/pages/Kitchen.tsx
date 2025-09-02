@@ -1,0 +1,206 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { formatDistance } from "date-fns";
+import { es } from "date-fns/locale";
+import { Check, Clock, DollarSign } from "lucide-react";
+
+interface Order {
+  id: string;
+  nombre: string;
+  pedido: string;
+  total: number;
+  fecha: string;
+  status: string;
+  created_at: string;
+}
+
+const Kitchen = () => {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Fetch initial pending orders
+    const fetchOrders = async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching orders:', error);
+      } else {
+        setOrders(data || []);
+      }
+    };
+
+    fetchOrders();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel('kitchen-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          console.log('Order update:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newOrder = payload.new as Order;
+            if (newOrder.status === 'pending') {
+              setOrders(prev => [...prev, newOrder]);
+              toast({
+                title: "¡Nuevo Pedido!",
+                description: `${newOrder.nombre} - ${newOrder.pedido}`,
+                duration: 5000,
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedOrder = payload.new as Order;
+            setOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [toast]);
+
+  const markAsCompleted = async (orderId: string) => {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: 'completed' })
+      .eq('id', orderId);
+
+    if (error) {
+      console.error('Error updating order:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo marcar el pedido como completado",
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Pedido Completado",
+        description: "El pedido ha sido marcado como listo",
+        variant: "default"
+      });
+    }
+  };
+
+  const getOrderAge = (createdAt: string) => {
+    const now = new Date();
+    const orderTime = new Date(createdAt);
+    const diffInMinutes = Math.floor((now.getTime() - orderTime.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return { text: "Recién llegado", urgent: false };
+    if (diffInMinutes < 15) return { text: `${diffInMinutes} min`, urgent: false };
+    if (diffInMinutes < 30) return { text: `${diffInMinutes} min`, urgent: true };
+    return { text: `${diffInMinutes} min`, urgent: true };
+  };
+
+  return (
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-4xl font-bold text-foreground mb-2">
+            🍔 Dashboard de Cocina
+          </h1>
+          <div className="flex items-center gap-4">
+            <Badge variant="outline" className="text-lg px-3 py-1">
+              {orders.length} pedidos pendientes
+            </Badge>
+            <Badge variant="secondary" className="text-lg px-3 py-1">
+              {new Date().toLocaleDateString('es-ES')}
+            </Badge>
+          </div>
+        </div>
+
+        {orders.length === 0 ? (
+          <Card className="text-center py-12">
+            <CardContent>
+              <Clock className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No hay pedidos pendientes</h3>
+              <p className="text-muted-foreground">
+                Los nuevos pedidos aparecerán aquí automáticamente
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {orders.map((order) => {
+              const orderAge = getOrderAge(order.created_at);
+              return (
+                <Card 
+                  key={order.id} 
+                  className={`transition-all duration-300 hover:shadow-lg ${
+                    orderAge.urgent 
+                      ? 'border-kitchen-urgent shadow-md' 
+                      : 'border-border'
+                  }`}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg">{order.nombre}</CardTitle>
+                      <div className="flex flex-col gap-2 items-end">
+                        <Badge 
+                          variant={orderAge.urgent ? "destructive" : "secondary"}
+                          className="text-xs"
+                        >
+                          <Clock className="w-3 h-3 mr-1" />
+                          {orderAge.text}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          <DollarSign className="w-3 h-3 mr-1" />
+                          ${order.total}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-muted p-3 rounded-md">
+                      <p className="font-medium text-sm text-muted-foreground mb-1">
+                        Pedido:
+                      </p>
+                      <p className="text-foreground whitespace-pre-wrap">
+                        {order.pedido}
+                      </p>
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground">
+                      Recibido: {formatDistance(new Date(order.created_at), new Date(), { 
+                        addSuffix: true, 
+                        locale: es 
+                      })}
+                    </div>
+
+                    <Button 
+                      onClick={() => markAsCompleted(order.id)}
+                      className="w-full bg-success hover:bg-success/90 text-success-foreground"
+                      size="lg"
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      Marcar como Listo
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Kitchen;
