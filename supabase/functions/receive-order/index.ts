@@ -25,7 +25,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { nombre, pedido, monto, direccion_envio } = await req.json();
+    const raw = await req.json();
+    const { nombre, pedido, monto } = raw;
+    const direccionEnvio =
+      (typeof raw.direccion_envio === 'string' && raw.direccion_envio.trim()) ||
+      (typeof raw.domicilio === 'string' && raw.domicilio.trim()) ||
+      (typeof raw.direccion === 'string' && raw.direccion.trim()) ||
+      null;
 
     if (!nombre || !pedido || !monto) {
       return new Response(JSON.stringify({ 
@@ -68,7 +74,7 @@ serve(async (req) => {
         monto: monto,
         total: monto,
         items,
-        direccion_envio,
+        direccion_envio: direccionEnvio,
         fecha: new Date().toISOString(),
         status: 'pending'
       })
