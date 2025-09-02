@@ -187,9 +187,16 @@ const Index = () => {
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold mb-4 text-foreground">
-            🍔 Dashboard Hamburguesería
-          </h1>
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <img 
+              src="/lovable-uploads/86ac5a9c-d0bd-40ac-88b0-07fc04f59e14.png" 
+              alt="Roses Burgers Logo" 
+              className="h-16 w-auto"
+            />
+            <h1 className="text-5xl font-bold text-foreground">
+              ROSES BURGERS
+            </h1>
+          </div>
           <p className="text-xl text-muted-foreground mb-6">
             Sistema de gestión de pedidos en tiempo real
           </p>
