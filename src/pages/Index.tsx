@@ -171,18 +171,6 @@ const Index = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Show delivery address if available */}
-          {order.direccion_envio && (
-            <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
-              <p className="font-medium text-sm text-blue-700 mb-1">
-                🚚 Dirección de Envío:
-              </p>
-              <p className="text-blue-900 text-sm">
-                {order.direccion_envio}
-              </p>
-            </div>
-          )}
-
           {/* Show items if parsed, otherwise show full pedido */}
           {order.items && order.items.length > 0 ? (
             <div className="bg-muted p-3 rounded-md">
@@ -209,6 +197,16 @@ const Index = () => {
               </p>
             </div>
           )}
+
+          {/* DOMICILIO section */}
+          <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
+            <p className="font-medium text-sm text-blue-700 mb-1">
+              🏠 DOMICILIO:
+            </p>
+            <p className="text-blue-900 text-sm">
+              {order.direccion_envio || "Sin dirección de envío especificada"}
+            </p>
+          </div>
           
           <div className="text-xs text-muted-foreground">
             {showCompleteButton ? 'Recibido' : 'Completado'}: {formatDistance(new Date(order.created_at), new Date(), { 
