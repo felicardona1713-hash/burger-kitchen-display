@@ -37,16 +37,13 @@ serve(async (req) => {
 
     // If no address field found, try to extract from pedido text
     if (!direccionEnvio && pedido) {
-      // Look for patterns like "domicilio en [address]", "en domicilio [address]", "para domicilio en [address]", "entrega en [address]"
+      // Look for patterns like "domicilio en [address]", "para domicilio en [address]", "entrega en [address]"
       const addressPatterns = [
         // Special pattern for "country" addresses that include lote and familia
-        /(?:para\s+)?(?:domicilio\s+en|en\s+domicilio)\s+(country[^,\n]*(?:,?\s*lote[^,\n]*)?(?:,?\s*familia[^,\n]*)?)/i,
-        /(?:para\s+)?(?:domicilio\s+en|en\s+domicilio)\s+([^,\n]+)/i,
+        /(?:para\s+)?domicilio\s+en\s+(country[^,\n]*(?:,?\s*lote[^,\n]*)?(?:,?\s*familia[^,\n]*)?)/i,
         /(?:para\s+)?domicilio\s+en\s+([^,\n]+)/i,
         /(?:entrega\s+)?en\s+([^,\n]+)/i,
-        /(?:dirección|direccion):\s*([^,\n]+)/i,
-        // Pattern for "en domicilio" without specific address
-        /en\s+domicilio/i
+        /(?:dirección|direccion):\s*([^,\n]+)/i
       ];
       
       for (const pattern of addressPatterns) {
