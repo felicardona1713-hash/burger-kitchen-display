@@ -39,6 +39,8 @@ serve(async (req) => {
     if (!direccionEnvio && pedido) {
       // Look for patterns like "domicilio en [address]", "para domicilio en [address]", "entrega en [address]"
       const addressPatterns = [
+        // Special pattern for "country" addresses that include lote and familia
+        /(?:para\s+)?domicilio\s+en\s+(country[^,\n]*(?:,?\s*lote[^,\n]*)?(?:,?\s*familia[^,\n]*)?)/i,
         /(?:para\s+)?domicilio\s+en\s+([^,\n]+)/i,
         /(?:entrega\s+)?en\s+([^,\n]+)/i,
         /(?:dirección|direccion):\s*([^,\n]+)/i
