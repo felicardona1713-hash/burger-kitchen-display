@@ -37,28 +37,31 @@ export type Database = {
           created_at: string
           fecha: string
           id: string
+          monto: number
           nombre: string
           pedido: string
-          status: string | null
-          total: number
+          status: string
+          total: number | null
         }
         Insert: {
           created_at?: string
-          fecha: string
+          fecha?: string
           id?: string
+          monto: number
           nombre: string
           pedido: string
-          status?: string | null
-          total: number
+          status?: string
+          total?: number | null
         }
         Update: {
           created_at?: string
           fecha?: string
           id?: string
+          monto?: number
           nombre?: string
           pedido?: string
-          status?: string | null
-          total?: number
+          status?: string
+          total?: number | null
         }
         Relationships: []
       }
