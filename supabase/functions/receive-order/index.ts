@@ -42,6 +42,7 @@ serve(async (req) => {
       .insert({
         nombre,
         pedido,
+        monto: monto,
         total: monto,
         fecha: new Date().toISOString(),
         status: 'pending'
