@@ -27,11 +27,32 @@ serve(async (req) => {
 
     const raw = await req.json();
     const { nombre, pedido, monto } = raw;
-    const direccionEnvio =
+    
+    // Extract address from various fields or from pedido text
+    let direccionEnvio =
       (typeof raw.direccion_envio === 'string' && raw.direccion_envio.trim()) ||
       (typeof raw.domicilio === 'string' && raw.domicilio.trim()) ||
       (typeof raw.direccion === 'string' && raw.direccion.trim()) ||
       null;
+
+    // If no address field found, try to extract from pedido text
+    if (!direccionEnvio && pedido) {
+      // Look for patterns like "domicilio en [address]", "para domicilio en [address]", "entrega en [address]"
+      const addressPatterns = [
+        /(?:para\s+)?domicilio\s+en\s+([^,\n]+)/i,
+        /(?:entrega\s+)?en\s+([^,\n]+)/i,
+        /(?:dirección|direccion):\s*([^,\n]+)/i
+      ];
+      
+      for (const pattern of addressPatterns) {
+        const match = pedido.match(pattern);
+        if (match && match[1]) {
+          direccionEnvio = match[1].trim();
+          console.log('Address extracted from pedido:', direccionEnvio);
+          break;
+        }
+      }
+    }
 
     if (!nombre || !pedido || !monto) {
       return new Response(JSON.stringify({ 
