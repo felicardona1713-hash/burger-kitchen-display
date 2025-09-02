@@ -25,7 +25,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { nombre, pedido, monto } = await req.json();
+    const { nombre, pedido, monto, direccion_envio } = await req.json();
 
     if (!nombre || !pedido || !monto) {
       return new Response(JSON.stringify({ 
@@ -36,6 +36,29 @@ serve(async (req) => {
       });
     }
 
+    // Parse items from pedido text
+    const parseItems = (pedidoText: string) => {
+      const items = [];
+      // Look for patterns like "2 Ruby Clove dobles", "1 1967 doble"
+      const itemMatches = pedidoText.match(/(\d+)\s+([^,]+?)(?:,|$)/g);
+      
+      if (itemMatches) {
+        itemMatches.forEach(match => {
+          const cleanMatch = match.replace(/,$/, '').trim();
+          const quantityMatch = cleanMatch.match(/^(\d+)\s+(.+)/);
+          if (quantityMatch) {
+            const quantity = parseInt(quantityMatch[1]);
+            const name = quantityMatch[2].trim();
+            items.push({ quantity, name });
+          }
+        });
+      }
+      
+      return items.length > 0 ? items : null;
+    };
+
+    const items = parseItems(pedido);
+
     // Insert the order into the database
     const { data, error } = await supabase
       .from('orders')
@@ -44,6 +67,8 @@ serve(async (req) => {
         pedido,
         monto: monto,
         total: monto,
+        items,
+        direccion_envio,
         fecha: new Date().toISOString(),
         status: 'pending'
       })

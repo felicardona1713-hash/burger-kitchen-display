@@ -9,6 +9,11 @@ import { formatDistance } from "date-fns";
 import { es } from "date-fns/locale";
 import { Check, Clock, DollarSign, ChefHat } from "lucide-react";
 
+interface OrderItem {
+  quantity: number;
+  name: string;
+}
+
 interface Order {
   id: string;
   nombre: string;
@@ -17,6 +22,8 @@ interface Order {
   fecha: string;
   status: string;
   created_at: string;
+  items?: OrderItem[];
+  direccion_envio?: string;
 }
 
 const Index = () => {
@@ -40,10 +47,22 @@ const Index = () => {
         .order('created_at', { ascending: false });
       
       if (pendingError) console.error('Error fetching pending orders:', pendingError);
-      else setPendingOrders(pending || []);
+      else {
+        const typedPending = (pending || []).map(order => ({
+          ...order,
+          items: Array.isArray(order.items) ? order.items as unknown as OrderItem[] : undefined
+        }));
+        setPendingOrders(typedPending);
+      }
       
       if (completedError) console.error('Error fetching completed orders:', completedError);
-      else setCompletedOrders(completed || []);
+      else {
+        const typedCompleted = (completed || []).map(order => ({
+          ...order,
+          items: Array.isArray(order.items) ? order.items as unknown as OrderItem[] : undefined
+        }));
+        setCompletedOrders(typedCompleted);
+      }
     };
 
     fetchOrders();
@@ -152,14 +171,44 @@ const Index = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-muted p-3 rounded-md">
-            <p className="font-medium text-sm text-muted-foreground mb-1">
-              Pedido:
-            </p>
-            <p className="text-foreground whitespace-pre-wrap">
-              {order.pedido}
-            </p>
-          </div>
+          {/* Show delivery address if available */}
+          {order.direccion_envio && (
+            <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
+              <p className="font-medium text-sm text-blue-700 mb-1">
+                🚚 Dirección de Envío:
+              </p>
+              <p className="text-blue-900 text-sm">
+                {order.direccion_envio}
+              </p>
+            </div>
+          )}
+
+          {/* Show items if parsed, otherwise show full pedido */}
+          {order.items && order.items.length > 0 ? (
+            <div className="bg-muted p-3 rounded-md">
+              <p className="font-medium text-sm text-muted-foreground mb-2">
+                Items del Pedido:
+              </p>
+              <div className="space-y-1">
+                {order.items.map((item, index) => (
+                  <div key={index} className="flex justify-between text-sm">
+                    <span className="text-foreground">
+                      {item.quantity}x {item.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-muted p-3 rounded-md">
+              <p className="font-medium text-sm text-muted-foreground mb-1">
+                Pedido:
+              </p>
+              <p className="text-foreground whitespace-pre-wrap">
+                {order.pedido}
+              </p>
+            </div>
+          )}
           
           <div className="text-xs text-muted-foreground">
             {showCompleteButton ? 'Recibido' : 'Completado'}: {formatDistance(new Date(order.created_at), new Date(), { 

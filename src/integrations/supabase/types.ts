@@ -35,8 +35,10 @@ export type Database = {
       orders: {
         Row: {
           created_at: string
+          direccion_envio: string | null
           fecha: string
           id: string
+          items: Json | null
           monto: number
           nombre: string
           pedido: string
@@ -45,8 +47,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          direccion_envio?: string | null
           fecha?: string
           id?: string
+          items?: Json | null
           monto: number
           nombre: string
           pedido: string
@@ -55,8 +59,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          direccion_envio?: string | null
           fecha?: string
           id?: string
+          items?: Json | null
           monto?: number
           nombre?: string
           pedido?: string
