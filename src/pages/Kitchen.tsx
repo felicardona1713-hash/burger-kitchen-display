@@ -13,6 +13,12 @@ interface OrderItem {
   name: string;
 }
 
+interface ItemStatus {
+  name: string;
+  quantity: number;
+  completed: boolean;
+}
+
 interface Order {
   id: string;
   nombre: string;
@@ -22,6 +28,7 @@ interface Order {
   status: string;
   created_at: string;
   items?: OrderItem[];
+  item_status?: ItemStatus[];
   direccion_envio?: string;
 }
 
@@ -43,7 +50,8 @@ const Kitchen = () => {
       } else {
         const typedOrders = (data || []).map(order => ({
           ...order,
-          items: Array.isArray(order.items) ? order.items as unknown as OrderItem[] : undefined
+          items: Array.isArray(order.items) ? order.items as unknown as OrderItem[] : undefined,
+          item_status: Array.isArray(order.item_status) ? order.item_status as unknown as ItemStatus[] : undefined
         }));
         setOrders(typedOrders);
       }
@@ -86,6 +94,45 @@ const Kitchen = () => {
       supabase.removeChannel(channel);
     };
   }, [toast]);
+
+  const toggleItemCompleted = async (orderId: string, itemIndex: number) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || !order.item_status) return;
+
+    const updatedItemStatus = [...order.item_status];
+    updatedItemStatus[itemIndex] = {
+      ...updatedItemStatus[itemIndex],
+      completed: !updatedItemStatus[itemIndex].completed
+    };
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ item_status: updatedItemStatus as any })
+      .eq('id', orderId);
+
+    if (error) {
+      console.error('Error updating item status:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del item",
+        variant: "destructive"
+      });
+    } else {
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === orderId 
+          ? { ...o, item_status: updatedItemStatus }
+          : o
+      ));
+      
+      const itemName = updatedItemStatus[itemIndex].name;
+      const action = updatedItemStatus[itemIndex].completed ? "completado" : "pendiente";
+      toast({
+        title: `Item ${action}`,
+        description: `${itemName} marcado como ${action}`,
+      });
+    }
+  };
 
   const markAsCompleted = async (orderId: string) => {
     const { error } = await supabase
@@ -191,23 +238,50 @@ const Kitchen = () => {
                        </div>
                      )}
 
-                     {/* Show items if parsed, otherwise show full pedido */}
-                     {order.items && order.items.length > 0 ? (
-                       <div className="bg-muted p-3 rounded-md">
-                         <p className="font-medium text-sm text-muted-foreground mb-2">
-                           Items del Pedido:
-                         </p>
-                         <div className="space-y-1">
-                           {order.items.map((item, index) => (
-                             <div key={index} className="flex justify-between text-sm">
-                               <span className="text-foreground">
-                                 {item.quantity}x {item.name}
-                               </span>
-                             </div>
-                           ))}
-                         </div>
-                       </div>
-                     ) : (
+                      {/* Show items TO-DO list if parsed, otherwise show full pedido */}
+                      {order.item_status && order.item_status.length > 0 ? (
+                        <div className="bg-muted p-3 rounded-md">
+                          <p className="font-medium text-sm text-muted-foreground mb-3">
+                            📋 TO-DO Items:
+                          </p>
+                          <div className="space-y-2">
+                            {order.item_status.map((item, index) => (
+                              <div key={index} className="flex items-center gap-3">
+                                <Button
+                                  variant={item.completed ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => toggleItemCompleted(order.id, index)}
+                                  className={`flex items-center gap-2 ${
+                                    item.completed 
+                                      ? "bg-success text-success-foreground hover:bg-success/90" 
+                                      : "hover:bg-muted-foreground/10"
+                                  }`}
+                                >
+                                  <Check className={`w-3 h-3 ${item.completed ? "opacity-100" : "opacity-30"}`} />
+                                  <span className={`text-xs ${item.completed ? "line-through" : ""}`}>
+                                    {item.quantity}x {item.name}
+                                  </span>
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : order.items && order.items.length > 0 ? (
+                        <div className="bg-muted p-3 rounded-md">
+                          <p className="font-medium text-sm text-muted-foreground mb-2">
+                            Items del Pedido:
+                          </p>
+                          <div className="space-y-1">
+                            {order.items.map((item, index) => (
+                              <div key={index} className="flex justify-between text-sm">
+                                <span className="text-foreground">
+                                  {item.quantity}x {item.name}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
                        <div className="bg-muted p-3 rounded-md">
                          <p className="font-medium text-sm text-muted-foreground mb-1">
                            Pedido:

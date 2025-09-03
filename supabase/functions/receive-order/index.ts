@@ -75,43 +75,36 @@ serve(async (req) => {
         .replace(/\s+con\s+/g, ' con ')
         .replace(/\s+sin\s+/g, ' sin ');
       
-      // Look for burger patterns with quantities
-      const burgerPatterns = [
+      // Enhanced patterns for better item detection
+      const itemPatterns = [
+        // Pattern: "2x Hamburguesa Clásica", "1x Papas Fritas"
+        /(\d+)x?\s+([^,\n]+?)(?=\s*(?:,|$))/gi,
         // Pattern: "2 Ruby Clove dobles", "1 Cheeseburger triple"
-        /(\d+)\s+([a-z0-9\s]+(?:doble|triple|simple|burger|cheese|bacon|blue|ruby|clove|smokey)(?:[^,\n]*?)?)(?=\s*(?:,|y|con papas|sin papas|para|$))/gi,
-        // Pattern: "Ruby Clove doble", "Cheeseburger triple" (assuming quantity 1)
-        /(?:^|,\s*)([a-z0-9\s]+(?:doble|triple|simple|burger|cheese|bacon|blue|ruby|clove|smokey)(?:[^,\n]*?)?)(?=\s*(?:,|y|con papas|sin papas|para|$))/gi
+        /(\d+)\s+([a-z0-9\s]+(?:doble|triple|simple|burger|cheese|bacon|blue|ruby|clove|smokey|hamburguesa|papas|coca|pepsi|sprite|agua|combo)(?:[^,\n]*?)?)(?=\s*(?:,|y|con|sin|para|$))/gi,
+        // Pattern: individual items without explicit quantity
+        /(?:^|,\s*)([a-z0-9\s]+(?:doble|triple|simple|burger|cheese|bacon|blue|ruby|clove|smokey|hamburguesa|papas|coca|pepsi|sprite|agua|combo)(?:[^,\n]*?)?)(?=\s*(?:,|y|con|sin|para|$))/gi
       ];
       
-      // First try to find items with explicit quantities
-      let matches = cleanText.match(burgerPatterns[0]);
-      if (matches) {
-        matches.forEach(match => {
-          const quantityMatch = match.trim().match(/^(\d+)\s+(.+)/);
-          if (quantityMatch) {
-            const quantity = parseInt(quantityMatch[1]);
-            let name = quantityMatch[2].trim();
-            // Clean up the name
-            name = name.replace(/\s+para\s+domicilio.*$/i, '').trim();
-            items.push({ quantity, name });
-          }
-        });
-      }
-      
-      // If no explicit quantities found, try to find individual burger names
-      if (items.length === 0) {
-        matches = cleanText.match(burgerPatterns[1]);
-        if (matches) {
+      // Try each pattern
+      for (const pattern of itemPatterns) {
+        const matches = cleanText.match(pattern);
+        if (matches && matches.length > 0) {
           matches.forEach(match => {
-            let name = match.replace(/^,\s*/, '').trim();
-            // Skip if it looks like a quantity pattern we already processed
-            if (!/^\d+\s+/.test(name)) {
-              name = name.replace(/\s+para\s+domicilio.*$/i, '').trim();
-              if (name) {
-                items.push({ quantity: 1, name });
+            const quantityMatch = match.trim().match(/^(\d+)x?\s+(.+)/) || match.trim().match(/^,?\s*(.+)/);
+            if (quantityMatch) {
+              const quantity = quantityMatch.length > 2 ? parseInt(quantityMatch[1]) : 1;
+              let name = quantityMatch.length > 2 ? quantityMatch[2].trim() : quantityMatch[1].trim();
+              
+              // Clean up the name
+              name = name.replace(/^,\s*/, '').replace(/\s+para\s+domicilio.*$/i, '').trim();
+              
+              // Skip if name is too short or already processed
+              if (name.length > 2 && !items.some(item => item.name.toLowerCase() === name.toLowerCase())) {
+                items.push({ quantity, name });
               }
             }
           });
+          break; // Stop at first successful pattern
         }
       }
       
@@ -119,6 +112,13 @@ serve(async (req) => {
     };
 
     const items = parseItems(pedido);
+
+    // Create item_status array for tracking individual item completion
+    const itemStatus = items ? items.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      completed: false
+    })) : null;
 
     // Insert the order into the database
     const { data, error } = await supabase
@@ -129,6 +129,7 @@ serve(async (req) => {
         monto: monto,
         total: monto,
         items,
+        item_status: itemStatus,
         direccion_envio: direccionEnvio,
         fecha: new Date().toISOString(),
         status: 'pending'

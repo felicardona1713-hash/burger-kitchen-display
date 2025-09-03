@@ -1,0 +1,30 @@
+{
+  "simple_order": {
+    "nombre": "Juan Pérez",
+    "pedido": "1x Hamburguesa Clásica, 1x Papas Fritas, 1x Coca-Cola",
+    "monto": 25.50
+  },
+  "complex_order": {
+    "nombre": "María García",
+    "pedido": "2x Cheeseburger doble, 1x Ruby Clove triple, 3x Papas Fritas, 2x Sprite, 1x Agua mineral",
+    "monto": 45.80,
+    "direccion_envio": "Av. Libertador 1234, Apt 5B"
+  },
+  "combo_order": {
+    "nombre": "Carlos López",
+    "pedido": "1 Cheeseburger doble con papas fritas en combo, 1x Smokey Bacon simple, 1x Coca-Cola, para domicilio en Sarratea 691",
+    "monto": 32.00
+  },
+  "multiple_burgers": {
+    "nombre": "Familia Rodríguez",
+    "pedido": "3x Hamburguesa Clásica, 2x Cheeseburger triple, 1x Blue Cheese doble, 4x Papas Fritas, 2x Coca-Cola, 1x Pepsi, 1x Sprite",
+    "monto": 67.90,
+    "domicilio": "Country Club, Lote 15, Familia Rodríguez"
+  },
+  "business_order": {
+    "nombre": "Oficina TechCorp",
+    "pedido": "5x Ruby Clove doble, 3x Smokey Bacon triple, 2x Blue Cheese simple, 8x Papas Fritas, 6x Coca-Cola, 2x Agua mineral",
+    "monto": 89.50,
+    "direccion": "Torre Empresarial, Piso 12, Oficina 1205"
+  }
+}

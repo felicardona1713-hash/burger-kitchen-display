@@ -38,6 +38,7 @@ export type Database = {
           direccion_envio: string | null
           fecha: string
           id: string
+          item_status: Json | null
           items: Json | null
           monto: number
           nombre: string
@@ -50,6 +51,7 @@ export type Database = {
           direccion_envio?: string | null
           fecha?: string
           id?: string
+          item_status?: Json | null
           items?: Json | null
           monto: number
           nombre: string
@@ -62,6 +64,7 @@ export type Database = {
           direccion_envio?: string | null
           fecha?: string
           id?: string
+          item_status?: Json | null
           items?: Json | null
           monto?: number
           nombre?: string
