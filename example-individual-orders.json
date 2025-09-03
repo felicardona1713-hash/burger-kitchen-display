@@ -1,0 +1,26 @@
+[
+  {
+    "nombre": "Juan Pérez",
+    "pedido": "1x Cheeseburger doble",
+    "monto": 15.50,
+    "direccion_envio": "Av. Libertador 1234, Apt 5B"
+  },
+  {
+    "nombre": "Juan Pérez", 
+    "pedido": "1x Cheeseburger doble",
+    "monto": 15.50,
+    "direccion_envio": "Av. Libertador 1234, Apt 5B"
+  },
+  {
+    "nombre": "Juan Pérez",
+    "pedido": "1x Papas Fritas",
+    "monto": 8.00,
+    "direccion_envio": "Av. Libertador 1234, Apt 5B"
+  },
+  {
+    "nombre": "Juan Pérez",
+    "pedido": "1x Coca-Cola",
+    "monto": 5.00,
+    "direccion_envio": "Av. Libertador 1234, Apt 5B"
+  }
+]
