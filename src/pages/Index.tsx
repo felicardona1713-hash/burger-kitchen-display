@@ -90,7 +90,14 @@ const Index = () => {
           if (payload.eventType === 'INSERT') {
             const newOrder = payload.new as Order;
             if (newOrder.status === 'pending') {
-              setPendingOrders(prev => [newOrder, ...prev]);
+              setPendingOrders(prev => {
+                const updatedOrders = [newOrder, ...prev];
+                // Imprimir automáticamente el nuevo pedido
+                setTimeout(() => {
+                  printSingleOrder(newOrder);
+                }, 500); // Pequeño delay para asegurar que el estado se actualice
+                return updatedOrders;
+              });
               toast({
                 title: "¡Nuevo Pedido!",
                 description: `${newOrder.nombre} - $${newOrder.total}`,
@@ -182,6 +189,166 @@ const Index = () => {
     if (diffInMinutes < 15) return { text: `${diffInMinutes} min`, urgent: false };
     if (diffInMinutes < 30) return { text: `${diffInMinutes} min`, urgent: true };
     return { text: `${diffInMinutes} min`, urgent: true };
+  };
+
+  const printSingleOrder = (order: Order) => {
+    const orderAge = getOrderAge(order.created_at);
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ticket Pedido - Roses Burgers</title>
+          <style>
+            body { 
+              font-family: 'Courier New', monospace; 
+              margin: 0; 
+              padding: 10px;
+              font-size: 12px;
+              line-height: 1.2;
+              width: 80mm;
+              max-width: 300px;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 15px; 
+              border-bottom: 1px dashed #000; 
+              padding-bottom: 8px; 
+            }
+            .company-name { 
+              font-weight: bold; 
+              font-size: 14px; 
+              margin-bottom: 3px; 
+            }
+            .ticket-info { 
+              font-size: 10px; 
+              margin-bottom: 10px; 
+            }
+            .order { 
+              margin-bottom: 15px; 
+              border-bottom: 1px dashed #000; 
+              padding-bottom: 10px; 
+            }
+            .order-header { 
+              font-weight: bold; 
+              margin-bottom: 5px; 
+              text-transform: uppercase;
+            }
+            .order-time { 
+              font-size: 10px; 
+              color: #666; 
+            }
+            .items { 
+              margin: 8px 0; 
+            }
+            .item { 
+              margin: 2px 0; 
+              display: flex; 
+              justify-content: space-between;
+            }
+            .item-name { 
+              flex: 1; 
+            }
+            .item-qty { 
+              margin-left: 10px; 
+              font-weight: bold; 
+            }
+            .delivery { 
+              background: #f8f8f8; 
+              padding: 5px; 
+              margin: 5px 0; 
+              font-size: 11px;
+              border: 1px solid #ddd;
+            }
+            .total { 
+              font-weight: bold; 
+              text-align: right; 
+              margin-top: 5px;
+              font-size: 13px;
+            }
+            .urgent { 
+              background: #ffe6e6; 
+              border: 1px solid #ff9999;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 15px;
+              padding-top: 8px;
+              border-top: 1px dashed #000;
+              font-size: 10px;
+            }
+            @media print {
+              body { 
+                margin: 0; 
+                width: 80mm;
+                font-size: 11px;
+              }
+              .order { 
+                break-inside: avoid; 
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company-name">ROSES BURGERS</div>
+            <div>CUIT: 20-12345678-9</div>
+            <div>IVA RESPONSABLE INSCRIPTO</div>
+            <div class="ticket-info">
+              TICKET COMANDA<br>
+              ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR')}<br>
+              NUEVO PEDIDO
+            </div>
+          </div>
+          
+          <div class="order ${orderAge.urgent ? 'urgent' : ''}">
+            <div class="order-header">
+              PEDIDO - ${order.nombre}
+            </div>
+            <div class="order-time">
+              Tiempo: ${orderAge.text} ${orderAge.urgent ? '⚠️ URGENTE' : ''}
+            </div>
+            
+            <div class="items">
+              ${order.item_status && order.item_status.length > 0 ? 
+                order.item_status.map(item => 
+                  `<div class="item">
+                    <span class="item-name">☐ ${item.name}</span>
+                    <span class="item-qty">${item.quantity}x</span>
+                  </div>`
+                ).join('') :
+                `<div class="item">
+                  <span class="item-name">${order.pedido}</span>
+                </div>`
+              }
+            </div>
+            
+            <div class="delivery">
+              <strong>ENTREGA:</strong><br>
+              ${order.direccion_envio || 'RETIRO EN LOCAL'}
+            </div>
+            
+            <div class="total">
+              TOTAL: $${order.total}
+            </div>
+          </div>
+          
+          <div class="footer">
+            DOCUMENTO NO VÁLIDO COMO FACTURA<br>
+            COMANDA INTERNA DE COCINA<br>
+            www.rosesburgers.com.ar
+          </div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }
   };
 
   const printPendingOrders = () => {
