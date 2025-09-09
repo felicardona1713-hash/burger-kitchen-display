@@ -189,50 +189,151 @@ const Index = () => {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Pedidos Pendientes - Roses Burgers</title>
+          <title>Ticket Pedidos - Roses Burgers</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-            .order { margin-bottom: 20px; border: 1px solid #333; padding: 15px; page-break-inside: avoid; }
-            .order-header { font-weight: bold; font-size: 16px; margin-bottom: 10px; }
-            .order-items { margin: 10px 0; }
-            .item { margin: 5px 0; padding: 3px 0; }
-            .delivery { background: #f0f0f0; padding: 10px; margin: 10px 0; border-left: 4px solid #333; }
-            .total { font-weight: bold; font-size: 18px; text-align: right; }
-            .urgent { border-color: #ff0000; background: #fff5f5; }
+            body { 
+              font-family: 'Courier New', monospace; 
+              margin: 0; 
+              padding: 10px;
+              font-size: 12px;
+              line-height: 1.2;
+              width: 80mm;
+              max-width: 300px;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 15px; 
+              border-bottom: 1px dashed #000; 
+              padding-bottom: 8px; 
+            }
+            .company-name { 
+              font-weight: bold; 
+              font-size: 14px; 
+              margin-bottom: 3px; 
+            }
+            .ticket-info { 
+              font-size: 10px; 
+              margin-bottom: 10px; 
+            }
+            .order { 
+              margin-bottom: 15px; 
+              border-bottom: 1px dashed #000; 
+              padding-bottom: 10px; 
+            }
+            .order-header { 
+              font-weight: bold; 
+              margin-bottom: 5px; 
+              text-transform: uppercase;
+            }
+            .order-time { 
+              font-size: 10px; 
+              color: #666; 
+            }
+            .items { 
+              margin: 8px 0; 
+            }
+            .item { 
+              margin: 2px 0; 
+              display: flex; 
+              justify-content: space-between;
+            }
+            .item-name { 
+              flex: 1; 
+            }
+            .item-qty { 
+              margin-left: 10px; 
+              font-weight: bold; 
+            }
+            .delivery { 
+              background: #f8f8f8; 
+              padding: 5px; 
+              margin: 5px 0; 
+              font-size: 11px;
+              border: 1px solid #ddd;
+            }
+            .total { 
+              font-weight: bold; 
+              text-align: right; 
+              margin-top: 5px;
+              font-size: 13px;
+            }
+            .urgent { 
+              background: #ffe6e6; 
+              border: 1px solid #ff9999;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 15px;
+              padding-top: 8px;
+              border-top: 1px dashed #000;
+              font-size: 10px;
+            }
             @media print {
-              body { margin: 0; }
-              .order { break-inside: avoid; }
+              body { 
+                margin: 0; 
+                width: 80mm;
+                font-size: 11px;
+              }
+              .order { 
+                break-inside: avoid; 
+              }
             }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>ROSES BURGERS</h1>
-            <h2>Pedidos Pendientes</h2>
-            <p>Fecha: ${new Date().toLocaleDateString('es-AR')} - ${new Date().toLocaleTimeString('es-AR')}</p>
+            <div class="company-name">ROSES BURGERS</div>
+            <div>CUIT: 20-12345678-9</div>
+            <div>IVA RESPONSABLE INSCRIPTO</div>
+            <div class="ticket-info">
+              TICKET COMANDA<br>
+              ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR')}<br>
+              PEDIDOS PENDIENTES: ${pendingOrders.length}
+            </div>
           </div>
-          ${pendingOrders.map(order => {
+          
+          ${pendingOrders.map((order, index) => {
             const orderAge = getOrderAge(order.created_at);
             return `
               <div class="order ${orderAge.urgent ? 'urgent' : ''}">
                 <div class="order-header">
-                  Cliente: ${order.nombre} - Total: $${order.total} - Tiempo: ${orderAge.text}
+                  PEDIDO #${index + 1} - ${order.nombre}
                 </div>
-                <div class="order-items">
+                <div class="order-time">
+                  Tiempo: ${orderAge.text} ${orderAge.urgent ? '⚠️ URGENTE' : ''}
+                </div>
+                
+                <div class="items">
                   ${order.item_status && order.item_status.length > 0 ? 
                     order.item_status.map(item => 
-                      `<div class="item">☐ ${item.quantity}x ${item.name}</div>`
+                      `<div class="item">
+                        <span class="item-name">☐ ${item.name}</span>
+                        <span class="item-qty">${item.quantity}x</span>
+                      </div>`
                     ).join('') :
-                    `<div class="item">${order.pedido}</div>`
+                    `<div class="item">
+                      <span class="item-name">${order.pedido}</span>
+                    </div>`
                   }
                 </div>
+                
                 <div class="delivery">
-                  <strong>Dirección:</strong> ${order.direccion_envio || 'Sin dirección especificada'}
+                  <strong>ENTREGA:</strong><br>
+                  ${order.direccion_envio || 'RETIRO EN LOCAL'}
+                </div>
+                
+                <div class="total">
+                  TOTAL: $${order.total}
                 </div>
               </div>
             `;
           }).join('')}
+          
+          <div class="footer">
+            DOCUMENTO NO VÁLIDO COMO FACTURA<br>
+            COMANDA INTERNA DE COCINA<br>
+            www.rosesburgers.com.ar
+          </div>
         </body>
       </html>
     `;
