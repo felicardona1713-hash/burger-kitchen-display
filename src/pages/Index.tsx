@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistance } from "date-fns";
 import { es } from "date-fns/locale";
-import { Check, Clock, DollarSign, ChefHat } from "lucide-react";
+import { Check, Clock, DollarSign, ChefHat, Printer } from "lucide-react";
 
 interface OrderItem {
   quantity: number;
@@ -184,6 +184,69 @@ const Index = () => {
     return { text: `${diffInMinutes} min`, urgent: true };
   };
 
+  const printPendingOrders = () => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Pedidos Pendientes - Roses Burgers</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .order { margin-bottom: 20px; border: 1px solid #333; padding: 15px; page-break-inside: avoid; }
+            .order-header { font-weight: bold; font-size: 16px; margin-bottom: 10px; }
+            .order-items { margin: 10px 0; }
+            .item { margin: 5px 0; padding: 3px 0; }
+            .delivery { background: #f0f0f0; padding: 10px; margin: 10px 0; border-left: 4px solid #333; }
+            .total { font-weight: bold; font-size: 18px; text-align: right; }
+            .urgent { border-color: #ff0000; background: #fff5f5; }
+            @media print {
+              body { margin: 0; }
+              .order { break-inside: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>ROSES BURGERS</h1>
+            <h2>Pedidos Pendientes</h2>
+            <p>Fecha: ${new Date().toLocaleDateString('es-AR')} - ${new Date().toLocaleTimeString('es-AR')}</p>
+          </div>
+          ${pendingOrders.map(order => {
+            const orderAge = getOrderAge(order.created_at);
+            return `
+              <div class="order ${orderAge.urgent ? 'urgent' : ''}">
+                <div class="order-header">
+                  Cliente: ${order.nombre} - Total: $${order.total} - Tiempo: ${orderAge.text}
+                </div>
+                <div class="order-items">
+                  ${order.item_status && order.item_status.length > 0 ? 
+                    order.item_status.map(item => 
+                      `<div class="item">☐ ${item.quantity}x ${item.name}</div>`
+                    ).join('') :
+                    `<div class="item">${order.pedido}</div>`
+                  }
+                </div>
+                <div class="delivery">
+                  <strong>Dirección:</strong> ${order.direccion_envio || 'Sin dirección especificada'}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }
+  };
+
   const OrderCard = ({ order, showCompleteButton = true }: { order: Order; showCompleteButton?: boolean }) => {
     const orderAge = getOrderAge(order.created_at);
     
@@ -348,10 +411,22 @@ const Index = () => {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {pendingOrders.map((order) => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={printPendingOrders}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Imprimir Pedidos
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingOrders.map((order) => (
+                    <OrderCard key={order.id} order={order} />
+                  ))}
+                </div>
               </div>
             )}
           </TabsContent>
