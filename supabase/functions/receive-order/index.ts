@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1/dist/pdf-lib.esm.js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -147,10 +148,121 @@ serve(async (req) => {
 
     console.log('Order received and saved:', data);
     
+    // Generate PDF and send to webhook
+    const webhookUrl = Deno.env.get('N8N_WEBHOOK_URL');
+    let pdfBase64 = null;
+    
+    try {
+      // Generate PDF
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([226, 400]); // 80mm width
+      const font = await pdfDoc.embedFont(StandardFonts.Courier);
+      
+      const { width, height } = page.getSize();
+      let yPosition = height - 30;
+      const lineHeight = 12;
+      const margin = 10;
+      
+      // Helper function to add text lines
+      const addText = (text: string, size = 10, bold = false) => {
+        page.drawText(text, {
+          x: margin,
+          y: yPosition,
+          size,
+          font,
+          color: rgb(0, 0, 0),
+        });
+        yPosition -= lineHeight + (bold ? 2 : 0);
+      };
+      
+      // PDF Content
+      addText('ROSES BURGERS', 14, true);
+      addText('================================', 8);
+      addText(`PEDIDO #${data.id.slice(-8)}`, 12, true);
+      addText(`Fecha: ${new Date(data.fecha).toLocaleString('es-AR')}`, 8);
+      addText('================================', 8);
+      
+      addText(`Cliente: ${data.nombre}`, 10);
+      if (data.direccion_envio) {
+        addText(`Direccion: ${data.direccion_envio}`, 8);
+      }
+      addText('--------------------------------', 8);
+      
+      addText('ITEMS:', 10, true);
+      if (data.items && Array.isArray(data.items)) {
+        data.items.forEach((item: any) => {
+          addText(`${item.quantity}x ${item.name}`, 9);
+        });
+      } else {
+        addText(data.pedido, 9);
+      }
+      
+      addText('--------------------------------', 8);
+      addText(`TOTAL: $${data.monto}`, 12, true);
+      addText('================================', 8);
+      addText('Gracias por su compra!', 8);
+      
+      const pdfBytes = await pdfDoc.save();
+      pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
+      
+      console.log('PDF generated successfully');
+      
+      // Upload PDF to storage
+      const fileName = `invoice-${data.id}.pdf`;
+      const { error: uploadError } = await supabase.storage
+        .from('invoices')
+        .upload(fileName, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+        
+      if (uploadError) {
+        console.error('PDF upload error:', uploadError);
+      } else {
+        console.log('PDF uploaded successfully:', fileName);
+      }
+      
+    } catch (pdfError) {
+      console.error('PDF generation error:', pdfError);
+    }
+    
+    // Send to webhook if URL is configured
+    if (webhookUrl && pdfBase64) {
+      try {
+        const webhookPayload = {
+          orderId: data.id,
+          cliente: data.nombre,
+          pedido: data.pedido,
+          items: data.items,
+          total: data.monto,
+          direccion: data.direccion_envio,
+          fecha: data.fecha,
+          pdfBase64: pdfBase64
+        };
+        
+        const webhookResponse = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookPayload)
+        });
+        
+        if (webhookResponse.ok) {
+          console.log('Webhook sent successfully');
+        } else {
+          console.error('Webhook error:', await webhookResponse.text());
+        }
+      } catch (webhookError) {
+        console.error('Webhook send error:', webhookError);
+      }
+    }
+    
     return new Response(JSON.stringify({ 
       success: true, 
       message: 'Order received successfully',
-      order: data
+      order: data,
+      pdfGenerated: !!pdfBase64
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
