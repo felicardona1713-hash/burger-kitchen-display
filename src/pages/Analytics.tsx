@@ -87,15 +87,15 @@ const Analytics = () => {
       
       setProductStats(sortedProducts);
 
-      // Analyze customers - extract phone and name
+      // Analyze customers - extract only phone number
       const customerMap = new Map<string, { totalPedidos: number; totalGastado: number }>();
       
       allOrders.forEach(order => {
-        // Extract phone number and name from the "nombre" field
+        // Extract only phone number from the "nombre" field
         let clienteDisplay = order.nombre;
         if (order.nombre.includes(' - ')) {
           const parts = order.nombre.split(' - ');
-          clienteDisplay = `${parts[1]} (${parts[0]})`; // "Nombre (Teléfono)"
+          clienteDisplay = parts[0]; // Solo el teléfono
         }
         
         const current = customerMap.get(clienteDisplay) || { totalPedidos: 0, totalGastado: 0 };
