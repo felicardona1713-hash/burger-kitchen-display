@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDistance } from "date-fns";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line } from "recharts";
+import { formatDistance, startOfWeek, startOfMonth, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { TrendingUp, DollarSign, ShoppingBag, Users } from "lucide-react";
 
@@ -29,12 +31,19 @@ interface CustomerStats {
   totalGastado: number;
 }
 
+interface RevenueData {
+  period: string;
+  ingresos: number;
+}
+
 const Analytics = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [productStats, setProductStats] = useState<ProductStats[]>([]);
   const [customerStats, setCustomerStats] = useState<CustomerStats[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [monthlyRevenue, setMonthlyRevenue] = useState<RevenueData[]>([]);
+  const [weeklyRevenue, setWeeklyRevenue] = useState<RevenueData[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -54,15 +63,17 @@ const Analytics = () => {
       setTotalOrders(allOrders.length);
       setTotalRevenue(allOrders.reduce((sum, order) => sum + Number(order.total), 0));
 
-      // Analyze products
+      // Analyze products - extract only hamburger name
       const productMap = new Map<string, { cantidad: number; ingresos: number }>();
       
       allOrders.forEach(order => {
         const productos = order.pedido.split(',').map(p => p.trim());
         productos.forEach(producto => {
           if (producto) {
-            const current = productMap.get(producto) || { cantidad: 0, ingresos: 0 };
-            productMap.set(producto, {
+            // Extract only the hamburger name (first part before "con", "doble", etc.)
+            const nombreHamburguesa = producto.split(' con ')[0].split(' doble')[0].split(' triple')[0];
+            const current = productMap.get(nombreHamburguesa) || { cantidad: 0, ingresos: 0 };
+            productMap.set(nombreHamburguesa, {
               cantidad: current.cantidad + 1,
               ingresos: current.ingresos + Number(order.total) / productos.length
             });
@@ -76,12 +87,19 @@ const Analytics = () => {
       
       setProductStats(sortedProducts);
 
-      // Analyze customers
+      // Analyze customers - extract phone and name
       const customerMap = new Map<string, { totalPedidos: number; totalGastado: number }>();
       
       allOrders.forEach(order => {
-        const current = customerMap.get(order.nombre) || { totalPedidos: 0, totalGastado: 0 };
-        customerMap.set(order.nombre, {
+        // Extract phone number and name from the "nombre" field
+        let clienteDisplay = order.nombre;
+        if (order.nombre.includes(' - ')) {
+          const parts = order.nombre.split(' - ');
+          clienteDisplay = `${parts[1]} (${parts[0]})`; // "Nombre (Teléfono)"
+        }
+        
+        const current = customerMap.get(clienteDisplay) || { totalPedidos: 0, totalGastado: 0 };
+        customerMap.set(clienteDisplay, {
           totalPedidos: current.totalPedidos + 1,
           totalGastado: current.totalGastado + Number(order.total)
         });
@@ -92,6 +110,30 @@ const Analytics = () => {
         .sort((a, b) => b.totalGastado - a.totalGastado);
       
       setCustomerStats(sortedCustomers);
+
+      // Analyze monthly revenue
+      const monthlyMap = new Map<string, number>();
+      const weeklyMap = new Map<string, number>();
+      
+      allOrders.forEach(order => {
+        const date = new Date(order.created_at);
+        const monthKey = format(startOfMonth(date), 'MMM yyyy', { locale: es });
+        const weekKey = format(startOfWeek(date, { weekStartsOn: 1 }), 'dd MMM', { locale: es });
+        
+        monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + Number(order.total));
+        weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + Number(order.total));
+      });
+
+      const monthlyData = Array.from(monthlyMap.entries())
+        .map(([period, ingresos]) => ({ period, ingresos }))
+        .sort((a, b) => new Date(a.period).getTime() - new Date(b.period).getTime());
+      
+      const weeklyData = Array.from(weeklyMap.entries())
+        .map(([period, ingresos]) => ({ period, ingresos }))
+        .slice(-8); // Last 8 weeks
+      
+      setMonthlyRevenue(monthlyData);
+      setWeeklyRevenue(weeklyData);
     };
 
     fetchData();
@@ -150,6 +192,75 @@ const Analytics = () => {
               <div className="text-2xl font-bold">
                 ${totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : '0.00'}
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Revenue Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ingresos por Mes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  ingresos: {
+                    label: "Ingresos",
+                    color: "hsl(var(--primary))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyRevenue}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="period" />
+                    <YAxis />
+                    <ChartTooltip 
+                      content={<ChartTooltipContent />}
+                      formatter={(value) => [`$${Number(value).toFixed(2)}`, "Ingresos"]}
+                    />
+                    <Bar dataKey="ingresos" fill="var(--color-ingresos)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Ingresos por Semana</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  ingresos: {
+                    label: "Ingresos",
+                    color: "hsl(var(--primary))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={weeklyRevenue}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="period" />
+                    <YAxis />
+                    <ChartTooltip 
+                      content={<ChartTooltipContent />}
+                      formatter={(value) => [`$${Number(value).toFixed(2)}`, "Ingresos"]}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="ingresos" 
+                      stroke="var(--color-ingresos)" 
+                      strokeWidth={2}
+                      dot={{ fill: "var(--color-ingresos)" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
             </CardContent>
           </Card>
         </div>
