@@ -27,7 +27,22 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const raw = await req.json();
-    const { nombre, pedido, monto } = raw;
+    let { nombre, pedido, monto } = raw;
+    
+    // Convert pedido to array if it's a string
+    let pedidoArray: string[];
+    if (typeof pedido === 'string') {
+      pedidoArray = [pedido];
+    } else if (Array.isArray(pedido)) {
+      pedidoArray = pedido;
+    } else {
+      return new Response(JSON.stringify({ 
+        error: 'pedido must be a string or array' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
     // Extract address from various fields or from pedido text
     let direccionEnvio =
@@ -36,11 +51,11 @@ serve(async (req) => {
       (typeof raw.direccion === 'string' && raw.direccion.trim()) ||
       null;
 
-    // If no address field found, try to extract from pedido text
-    if (!direccionEnvio && pedido) {
-      // Look for patterns like "domicilio en [address]", "para domicilio en [address]", "entrega en [address]"
+    // If no address field found, try to extract from pedido array
+    if (!direccionEnvio && pedidoArray.length > 0) {
+      // Join array to search for address patterns
+      const pedidoText = pedidoArray.join(', ');
       const addressPatterns = [
-        // Special pattern for "country" addresses that include lote and familia
         /(?:para\s+)?domicilio\s+en\s+(country[^,\n]*(?:,?\s*lote[^,\n]*)?(?:,?\s*familia[^,\n]*)?)/i,
         /(?:para\s+)?domicilio\s+en\s+([^,\n]+)/i,
         /(?:para\s+)?entrega\s+en\s+([^,\n]+)/i,
@@ -48,7 +63,7 @@ serve(async (req) => {
       ];
       
       for (const pattern of addressPatterns) {
-        const match = pedido.match(pattern);
+        const match = pedidoText.match(pattern);
         if (match && match[1]) {
           direccionEnvio = match[1].trim();
           console.log('Address extracted from pedido:', direccionEnvio);
@@ -66,53 +81,39 @@ serve(async (req) => {
       });
     }
 
-    // Parse items from pedido text
-    const parseItems = (pedidoText: string) => {
-      const items = [];
+    // Parse items from pedido array
+    const parseItemsFromArray = (pedidoArr: string[]) => {
+      const allItems = [];
       
-      // Clean text and split by common separators
-      const cleanText = pedidoText.toLowerCase()
-        .replace(/\s+y\s+/g, ', ')
-        .replace(/\s+con\s+/g, ' con ')
-        .replace(/\s+sin\s+/g, ' sin ');
-      
-      // Enhanced patterns for better item detection
-      const itemPatterns = [
-        // Pattern: "2x Hamburguesa Clásica", "1x Papas Fritas"
-        /(\d+)x?\s+([^,\n]+?)(?=\s*(?:,|$))/gi,
-        // Pattern: "2 Ruby Clove dobles", "1 Cheeseburger triple"
-        /(\d+)\s+([a-z0-9\s]+(?:doble|triple|simple|burger|cheese|bacon|blue|ruby|clove|smokey|hamburguesa|papas|coca|pepsi|sprite|agua|combo)(?:[^,\n]*?)?)(?=\s*(?:,|y|con|sin|para|$))/gi,
-        // Pattern: individual items without explicit quantity
-        /(?:^|,\s*)([a-z0-9\s]+(?:doble|triple|simple|burger|cheese|bacon|blue|ruby|clove|smokey|hamburguesa|papas|coca|pepsi|sprite|agua|combo)(?:[^,\n]*?)?)(?=\s*(?:,|y|con|sin|para|$))/gi
-      ];
-      
-      // Try each pattern
-      for (const pattern of itemPatterns) {
-        const matches = cleanText.match(pattern);
-        if (matches && matches.length > 0) {
-          matches.forEach(match => {
-            const quantityMatch = match.trim().match(/^(\d+)x?\s+(.+)/) || match.trim().match(/^,?\s*(.+)/);
-            if (quantityMatch) {
-              const quantity = quantityMatch.length > 2 ? parseInt(quantityMatch[1]) : 1;
-              let name = quantityMatch.length > 2 ? quantityMatch[2].trim() : quantityMatch[1].trim();
-              
-              // Clean up the name
-              name = name.replace(/^,\s*/, '').replace(/\s+para\s+domicilio.*$/i, '').trim();
-              
-              // Skip if name is too short or already processed
-              if (name.length > 2 && !items.some(item => item.name.toLowerCase() === name.toLowerCase())) {
-                items.push({ quantity, name });
-              }
-            }
-          });
-          break; // Stop at first successful pattern
+      for (const item of pedidoArr) {
+        const cleanText = item.toLowerCase().trim();
+        
+        // Pattern to extract quantity and name
+        const quantityMatch = cleanText.match(/^(\d+)\s*[x×]\s*(.+)$/);
+        
+        if (quantityMatch) {
+          const quantity = parseInt(quantityMatch[1]);
+          let name = quantityMatch[2].trim();
+          
+          // Clean up name
+          name = name.replace(/\s+para\s+domicilio.*$/i, '').trim();
+          
+          if (name.length > 0) {
+            allItems.push({ quantity, name });
+          }
+        } else {
+          // No quantity specified, assume 1
+          let name = cleanText.replace(/\s+para\s+domicilio.*$/i, '').trim();
+          if (name.length > 0) {
+            allItems.push({ quantity: 1, name });
+          }
         }
       }
       
-      return items.length > 0 ? items : null;
+      return allItems.length > 0 ? allItems : null;
     };
 
-    const items = parseItems(pedido);
+    const items = parseItemsFromArray(pedidoArray);
 
     // Create item_status array for tracking individual item completion
     const itemStatus = items ? items.map(item => ({
@@ -126,7 +127,7 @@ serve(async (req) => {
       .from('orders')
       .insert({
         nombre,
-        pedido,
+        pedido: pedidoArray,
         monto: monto,
         total: monto,
         items,
@@ -193,8 +194,10 @@ serve(async (req) => {
         data.items.forEach((item: any) => {
           addText(`${item.quantity}x ${item.name}`, 9);
         });
-      } else {
-        addText(data.pedido, 9);
+      } else if (Array.isArray(data.pedido)) {
+        data.pedido.forEach((item: string) => {
+          addText(item, 9);
+        });
       }
       
       addText('--------------------------------', 8);

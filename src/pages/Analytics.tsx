@@ -12,7 +12,7 @@ import { TrendingUp, DollarSign, ShoppingBag, Users } from "lucide-react";
 interface Order {
   id: string;
   nombre: string;
-  pedido: string;
+  pedido: string[];
   total: number;
   fecha: string;
   status: string;
@@ -67,7 +67,7 @@ const Analytics = () => {
       const productMap = new Map<string, { cantidad: number; ingresos: number }>();
       
       allOrders.forEach(order => {
-        const productos = order.pedido.split(',').map(p => p.trim());
+        const productos = order.pedido; // pedido is now an array
         productos.forEach(producto => {
           if (producto) {
             // Remove "1x", "2x", etc. and any quantity prefix variations

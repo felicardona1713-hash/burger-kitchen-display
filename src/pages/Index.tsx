@@ -23,7 +23,7 @@ interface ItemStatus {
 interface Order {
   id: string;
   nombre: string;
-  pedido: string;
+  pedido: string[];
   total: number;
   fecha: string;
   status: string;

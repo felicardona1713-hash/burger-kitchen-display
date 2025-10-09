@@ -60,7 +60,7 @@ export type Database = {
           items: Json | null
           monto: number
           nombre: string
-          pedido: string
+          pedido: string[]
           status: string
           total: number | null
         }
@@ -73,7 +73,7 @@ export type Database = {
           items?: Json | null
           monto: number
           nombre: string
-          pedido: string
+          pedido: string[]
           status?: string
           total?: number | null
         }
@@ -86,7 +86,7 @@ export type Database = {
           items?: Json | null
           monto?: number
           nombre?: string
-          pedido?: string
+          pedido?: string[]
           status?: string
           total?: number | null
         }
