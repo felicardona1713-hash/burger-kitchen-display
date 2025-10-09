@@ -317,21 +317,29 @@ const Index = () => {
             <div class="items">
                   ${order.item_status && order.item_status.length > 0 ? 
                     order.item_status.map((item, idx) => {
-                      const removal = order.items?.[idx]?.removals && order.items[idx].removals!.length > 0 
-                        ? ` (sin ${order.items[idx].removals!.join(', ')})` 
+                      const additions = order.items?.[idx]?.additions && order.items[idx].additions!.length > 0 
+                        ? ` (con ${order.items[idx].additions!.join(", ")})` 
                         : '';
+                      const removals = order.items?.[idx]?.removals && order.items[idx].removals!.length > 0 
+                        ? ` (sin ${order.items[idx].removals!.join(", ")})` 
+                        : '';
+                      const combo = item.combo ? " combo" : "";
                       return `<div class="item">
-                        <span class="item-name">☐ ${item.burger_type}${removal} ${item.patty_size}</span>
+                        <span class="item-name">☐ ${item.burger_type} ${item.patty_size}${combo}${additions}${removals}</span>
                         <span class="item-qty">${item.quantity}x</span>
                       </div>`;
                     }).join('') :
                     order.items && order.items.length > 0 ?
                     order.items.map(item => {
-                      const removal = item.removals && item.removals.length > 0 
-                        ? ` (sin ${item.removals.join(', ')})` 
+                      const additions = item.additions && item.additions.length > 0 
+                        ? ` (con ${item.additions.join(", ")})` 
                         : '';
+                      const removals = item.removals && item.removals.length > 0 
+                        ? ` (sin ${item.removals.join(", ")})` 
+                        : '';
+                      const combo = item.combo ? " combo" : "";
                       return `<div class="item">
-                        <span class="item-name">${item.quantity}x ${item.burger_type}${removal} ${item.patty_size}</span>
+                        <span class="item-name">${item.quantity}x ${item.burger_type} ${item.patty_size}${combo}${additions}${removals}</span>
                       </div>`;
                     }).join('') :
                     `<div class="item">
@@ -491,21 +499,29 @@ const Index = () => {
                 <div class="items">
                   ${order.item_status && order.item_status.length > 0 ? 
                     order.item_status.map((item, idx) => {
-                      const removal = order.items?.[idx]?.removals && order.items[idx].removals!.length > 0 
-                        ? ` (sin ${order.items[idx].removals!.join(', ')})` 
+                      const additions = order.items?.[idx]?.additions && order.items[idx].additions!.length > 0 
+                        ? ` (con ${order.items[idx].additions!.join(", ")})` 
                         : '';
+                      const removals = order.items?.[idx]?.removals && order.items[idx].removals!.length > 0 
+                        ? ` (sin ${order.items[idx].removals!.join(", ")})` 
+                        : '';
+                      const combo = item.combo ? " combo" : "";
                       return `<div class="item">
-                        <span class="item-name">☐ ${item.burger_type}${removal} ${item.patty_size}</span>
+                        <span class="item-name">☐ ${item.burger_type} ${item.patty_size}${combo}${additions}${removals}</span>
                         <span class="item-qty">${item.quantity}x</span>
                       </div>`;
                     }).join('') :
                     order.items && order.items.length > 0 ?
                     order.items.map(item => {
-                      const removal = item.removals && item.removals.length > 0 
-                        ? ` (sin ${item.removals.join(', ')})` 
+                      const additions = item.additions && item.additions.length > 0 
+                        ? ` (con ${item.additions.join(", ")})` 
                         : '';
+                      const removals = item.removals && item.removals.length > 0 
+                        ? ` (sin ${item.removals.join(", ")})` 
+                        : '';
+                      const combo = item.combo ? " combo" : "";
                       return `<div class="item">
-                        <span class="item-name">${item.quantity}x ${item.burger_type}${removal} ${item.patty_size}</span>
+                        <span class="item-name">${item.quantity}x ${item.burger_type} ${item.patty_size}${combo}${additions}${removals}</span>
                       </div>`;
                     }).join('') :
                     `<div class="item">
@@ -601,11 +617,13 @@ const Index = () => {
                      >
                        <Check className={`w-3 h-3 ${item.completed ? "opacity-100" : "opacity-30"}`} />
                        <span className={`text-xs ${item.completed ? "line-through" : ""}`}>
-                         {item.quantity}x {item.burger_type}
+                         {item.quantity}x {item.burger_type} {item.patty_size} {item.combo ? "combo" : ""}
+                         {order.items?.[index]?.additions && order.items[index].additions!.length > 0 && 
+                           ` (con ${order.items[index].additions!.join(", ")})`
+                         }
                          {order.items?.[index]?.removals && order.items[index].removals!.length > 0 && 
-                           ` (sin ${order.items[index].removals!.join(', ')})`
-                         } {item.patty_size}
-                         {item.combo && ' 🍟'}
+                           ` (sin ${order.items[index].removals!.join(", ")})`
+                         }
                        </span>
                      </Button>
                   </div>
@@ -619,17 +637,10 @@ const Index = () => {
               </p>
               <div className="space-y-2">
                 {order.items.map((item, index) => (
-                  <div key={index} className="text-sm">
-                    <div className="font-medium text-foreground">
-                      {item.quantity}x {item.burger_type}
-                      {item.removals && item.removals.length > 0 && ` (sin ${item.removals.join(', ')})`} {item.patty_size}
-                      {item.combo && ' 🍟'}
-                    </div>
-                    {item.additions && item.additions.length > 0 && (
-                      <div className="text-xs text-green-600 ml-4">
-                        + {item.additions.join(', ')}
-                      </div>
-                    )}
+                  <div key={index} className="text-sm font-medium text-foreground">
+                    {item.quantity}x {item.burger_type} {item.patty_size} {item.combo ? "combo" : ""}
+                    {item.additions && item.additions.length > 0 && ` (con ${item.additions.join(", ")})`}
+                    {item.removals && item.removals.length > 0 && ` (sin ${item.removals.join(", ")})`}
                   </div>
                 ))}
               </div>

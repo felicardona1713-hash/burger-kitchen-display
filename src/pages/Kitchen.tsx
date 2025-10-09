@@ -266,11 +266,13 @@ const Kitchen = () => {
                                  >
                                    <Check className={`w-3 h-3 ${item.completed ? "opacity-100" : "opacity-30"}`} />
                                    <span className={`text-xs ${item.completed ? "line-through" : ""}`}>
-                                     {item.quantity}x {item.burger_type}
+                                     {item.quantity}x {item.burger_type} {item.patty_size} {item.combo ? "combo" : ""}
+                                     {order.items?.[index]?.additions && order.items[index].additions!.length > 0 && 
+                                       ` (con ${order.items[index].additions!.join(", ")})`
+                                     }
                                      {order.items?.[index]?.removals && order.items[index].removals!.length > 0 && 
-                                       ` (sin ${order.items[index].removals!.join(', ')})`
-                                     } {item.patty_size}
-                                     {item.combo && ' 🍟'}
+                                       ` (sin ${order.items[index].removals!.join(", ")})`
+                                     }
                                    </span>
                                  </Button>
                               </div>
@@ -284,17 +286,10 @@ const Kitchen = () => {
                           </p>
                           <div className="space-y-2">
                             {order.items.map((item, index) => (
-                              <div key={index} className="text-sm">
-                                <div className="font-medium text-foreground">
-                                  {item.quantity}x {item.burger_type}
-                                  {item.removals && item.removals.length > 0 && ` (sin ${item.removals.join(', ')})`} {item.patty_size}
-                                  {item.combo && ' 🍟'}
-                                </div>
-                                {item.additions && item.additions.length > 0 && (
-                                  <div className="text-xs text-green-600 ml-4">
-                                    + {item.additions.join(', ')}
-                                  </div>
-                                )}
+                              <div key={index} className="text-sm font-medium text-foreground">
+                                {item.quantity}x {item.burger_type} {item.patty_size} {item.combo ? "combo" : ""}
+                                {item.additions && item.additions.length > 0 && ` (con ${item.additions.join(", ")})`}
+                                {item.removals && item.removals.length > 0 && ` (sin ${item.removals.join(", ")})`}
                               </div>
                             ))}
                           </div>
