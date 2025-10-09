@@ -73,8 +73,10 @@ const Analytics = () => {
             // Remove "1x", "2x", etc. from the beginning and extract only the hamburger name
             const productoLimpio = producto.replace(/^\d+x\s*/i, '').trim();
             const nombreHamburguesa = productoLimpio.split(' con ')[0].split(' doble')[0].split(' triple')[0].trim();
-            const current = productMap.get(nombreHamburguesa) || { cantidad: 0, ingresos: 0 };
-            productMap.set(nombreHamburguesa, {
+            // Normalize the product name to avoid duplicates (lowercase and remove extra spaces)
+            const nombreNormalizado = nombreHamburguesa.toLowerCase().replace(/\s+/g, ' ').trim();
+            const current = productMap.get(nombreNormalizado) || { cantidad: 0, ingresos: 0 };
+            productMap.set(nombreNormalizado, {
               cantidad: current.cantidad + 1,
               ingresos: current.ingresos + Number(order.total) / productos.length
             });
@@ -281,7 +283,7 @@ const Analytics = () => {
                         {index + 1}
                       </Badge>
                       <div>
-                        <p className="font-medium">{product.producto}</p>
+                        <p className="font-medium capitalize">{product.producto}</p>
                         <p className="text-sm text-muted-foreground">
                           ${product.ingresos.toFixed(2)} en ingresos
                         </p>
