@@ -302,9 +302,6 @@ const Analytics = () => {
                         </p>
                       </div>
                     </div>
-                    <Badge variant="outline">
-                      {product.cantidad} vendidos
-                    </Badge>
                   </div>
                 ))}
               </div>
