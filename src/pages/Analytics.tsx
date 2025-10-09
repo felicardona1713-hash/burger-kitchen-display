@@ -70,8 +70,11 @@ const Analytics = () => {
         const productos = order.pedido.split(',').map(p => p.trim());
         productos.forEach(producto => {
           if (producto) {
-            // Remove "1x", "2x", etc. from the beginning and extract only the hamburger name
-            let productoLimpio = producto.replace(/^\d+x\s*/i, '').trim();
+            // Remove "1x", "2x", etc. and any quantity prefix variations
+            let productoLimpio = producto
+              .replace(/^\d+\s*x\s*/i, '')  // Remove "1x ", "2 x ", etc.
+              .replace(/^\d+\s+/, '')        // Remove standalone numbers
+              .trim();
             
             // Extract base name by removing modifiers
             let nombreBase = productoLimpio
