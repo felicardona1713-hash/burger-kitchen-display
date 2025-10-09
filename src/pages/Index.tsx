@@ -315,23 +315,29 @@ const Index = () => {
             </div>
             
             <div class="items">
-              ${order.item_status && order.item_status.length > 0 ? 
-                order.item_status.map(item => 
-                  `<div class="item">
-                    <span class="item-name">☐ ${item.burger_type} ${item.patty_size}</span>
-                    <span class="item-qty">${item.quantity}x</span>
-                  </div>`
-                ).join('') :
-                order.items && order.items.length > 0 ?
-                order.items.map(item => 
-                  `<div class="item">
-                    <span class="item-name">${item.quantity}x ${item.burger_type} ${item.patty_size}</span>
-                  </div>`
-                ).join('') :
-                `<div class="item">
-                  <span class="item-name">Sin items</span>
-                </div>`
-              }
+                  ${order.item_status && order.item_status.length > 0 ? 
+                    order.item_status.map((item, idx) => {
+                      const removal = order.items?.[idx]?.removals && order.items[idx].removals!.length > 0 
+                        ? ` (sin ${order.items[idx].removals!.join(', ')})` 
+                        : '';
+                      return `<div class="item">
+                        <span class="item-name">☐ ${item.burger_type}${removal} ${item.patty_size}</span>
+                        <span class="item-qty">${item.quantity}x</span>
+                      </div>`;
+                    }).join('') :
+                    order.items && order.items.length > 0 ?
+                    order.items.map(item => {
+                      const removal = item.removals && item.removals.length > 0 
+                        ? ` (sin ${item.removals.join(', ')})` 
+                        : '';
+                      return `<div class="item">
+                        <span class="item-name">${item.quantity}x ${item.burger_type}${removal} ${item.patty_size}</span>
+                      </div>`;
+                    }).join('') :
+                    `<div class="item">
+                      <span class="item-name">Sin items</span>
+                    </div>`
+                  }
             </div>
             
             <div class="delivery">
@@ -484,18 +490,24 @@ const Index = () => {
                 
                 <div class="items">
                   ${order.item_status && order.item_status.length > 0 ? 
-                    order.item_status.map(item => 
-                      `<div class="item">
-                        <span class="item-name">☐ ${item.burger_type} ${item.patty_size}</span>
+                    order.item_status.map((item, idx) => {
+                      const removal = order.items?.[idx]?.removals && order.items[idx].removals!.length > 0 
+                        ? ` (sin ${order.items[idx].removals!.join(', ')})` 
+                        : '';
+                      return `<div class="item">
+                        <span class="item-name">☐ ${item.burger_type}${removal} ${item.patty_size}</span>
                         <span class="item-qty">${item.quantity}x</span>
-                      </div>`
-                    ).join('') :
+                      </div>`;
+                    }).join('') :
                     order.items && order.items.length > 0 ?
-                    order.items.map(item => 
-                      `<div class="item">
-                        <span class="item-name">${item.quantity}x ${item.burger_type} ${item.patty_size}</span>
-                      </div>`
-                    ).join('') :
+                    order.items.map(item => {
+                      const removal = item.removals && item.removals.length > 0 
+                        ? ` (sin ${item.removals.join(', ')})` 
+                        : '';
+                      return `<div class="item">
+                        <span class="item-name">${item.quantity}x ${item.burger_type}${removal} ${item.patty_size}</span>
+                      </div>`;
+                    }).join('') :
                     `<div class="item">
                       <span class="item-name">Sin items</span>
                     </div>`
@@ -589,8 +601,11 @@ const Index = () => {
                      >
                        <Check className={`w-3 h-3 ${item.completed ? "opacity-100" : "opacity-30"}`} />
                        <span className={`text-xs ${item.completed ? "line-through" : ""}`}>
-                         {item.quantity}x {item.burger_type} {item.patty_size}
-                         {item.combo && ' (combo)'}
+                         {item.quantity}x {item.burger_type}
+                         {order.items?.[index]?.removals && order.items[index].removals!.length > 0 && 
+                           ` (sin ${order.items[index].removals!.join(', ')})`
+                         } {item.patty_size}
+                         {item.combo && ' 🍟'}
                        </span>
                      </Button>
                   </div>
@@ -606,17 +621,13 @@ const Index = () => {
                 {order.items.map((item, index) => (
                   <div key={index} className="text-sm">
                     <div className="font-medium text-foreground">
-                      {item.quantity}x {item.burger_type} {item.patty_size}
-                      {item.combo && ' 🍟 combo'}
+                      {item.quantity}x {item.burger_type}
+                      {item.removals && item.removals.length > 0 && ` (sin ${item.removals.join(', ')})`} {item.patty_size}
+                      {item.combo && ' 🍟'}
                     </div>
                     {item.additions && item.additions.length > 0 && (
                       <div className="text-xs text-green-600 ml-4">
                         + {item.additions.join(', ')}
-                      </div>
-                    )}
-                    {item.removals && item.removals.length > 0 && (
-                      <div className="text-xs text-red-600 ml-4">
-                        sin {item.removals.join(', ')}
                       </div>
                     )}
                   </div>

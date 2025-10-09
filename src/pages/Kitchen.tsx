@@ -266,8 +266,11 @@ const Kitchen = () => {
                                  >
                                    <Check className={`w-3 h-3 ${item.completed ? "opacity-100" : "opacity-30"}`} />
                                    <span className={`text-xs ${item.completed ? "line-through" : ""}`}>
-                                     {item.quantity}x {item.burger_type} {item.patty_size}
-                                     {item.combo && ' (combo)'}
+                                     {item.quantity}x {item.burger_type}
+                                     {order.items?.[index]?.removals && order.items[index].removals!.length > 0 && 
+                                       ` (sin ${order.items[index].removals!.join(', ')})`
+                                     } {item.patty_size}
+                                     {item.combo && ' 🍟'}
                                    </span>
                                  </Button>
                               </div>
@@ -283,17 +286,13 @@ const Kitchen = () => {
                             {order.items.map((item, index) => (
                               <div key={index} className="text-sm">
                                 <div className="font-medium text-foreground">
-                                  {item.quantity}x {item.burger_type} {item.patty_size}
-                                  {item.combo && ' 🍟 combo'}
+                                  {item.quantity}x {item.burger_type}
+                                  {item.removals && item.removals.length > 0 && ` (sin ${item.removals.join(', ')})`} {item.patty_size}
+                                  {item.combo && ' 🍟'}
                                 </div>
                                 {item.additions && item.additions.length > 0 && (
                                   <div className="text-xs text-green-600 ml-4">
                                     + {item.additions.join(', ')}
-                                  </div>
-                                )}
-                                {item.removals && item.removals.length > 0 && (
-                                  <div className="text-xs text-red-600 ml-4">
-                                    sin {item.removals.join(', ')}
                                   </div>
                                 )}
                               </div>
