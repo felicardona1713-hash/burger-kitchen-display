@@ -81,6 +81,9 @@ const Analytics = () => {
       allOrders.forEach(order => {
         if (order.items && Array.isArray(order.items)) {
           order.items.forEach(item => {
+            // Skip items without burger_type
+            if (!item.burger_type) return;
+            
             const burgerType = item.burger_type.toLowerCase().trim();
             const current = productMap.get(burgerType) || { 
               cantidad: 0, 
@@ -90,15 +93,16 @@ const Analytics = () => {
             };
             
             const itemRevenue = Number(order.total) / order.items.length;
+            const pattySize = item.patty_size || 'simple';
             
             productMap.set(burgerType, {
-              cantidad: current.cantidad + item.quantity,
+              cantidad: current.cantidad + (item.quantity || 1),
               ingresos: current.ingresos + itemRevenue,
               porTamaño: {
                 ...current.porTamaño,
-                [item.patty_size]: (current.porTamaño[item.patty_size] || 0) + item.quantity
+                [pattySize]: (current.porTamaño[pattySize] || 0) + (item.quantity || 1)
               },
-              combos: current.combos + (item.combo ? item.quantity : 0)
+              combos: current.combos + (item.combo ? (item.quantity || 1) : 0)
             });
           });
         }
