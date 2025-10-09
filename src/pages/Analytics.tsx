@@ -280,7 +280,9 @@ const Analytics = () => {
                         {index + 1}
                       </Badge>
                       <div>
-                        <p className="font-medium">{product.producto}</p>
+                        <p className="font-medium">
+                          {product.producto.replace(/^\d+x\s*/i, '').trim()}
+                        </p>
                         <p className="text-sm text-muted-foreground">
                           ${product.ingresos.toFixed(2)} en ingresos
                         </p>
