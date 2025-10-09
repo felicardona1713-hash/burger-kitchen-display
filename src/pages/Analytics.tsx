@@ -71,10 +71,23 @@ const Analytics = () => {
         productos.forEach(producto => {
           if (producto) {
             // Remove "1x", "2x", etc. from the beginning and extract only the hamburger name
-            const productoLimpio = producto.replace(/^\d+x\s*/i, '').trim();
-            const nombreHamburguesa = productoLimpio.split(' con ')[0].split(' doble')[0].split(' triple')[0].trim();
-            // Normalize the product name to avoid duplicates (lowercase and remove extra spaces)
-            const nombreNormalizado = nombreHamburguesa.toLowerCase().replace(/\s+/g, ' ').trim();
+            let productoLimpio = producto.replace(/^\d+x\s*/i, '').trim();
+            
+            // Extract base name by removing modifiers
+            let nombreBase = productoLimpio
+              .split(' con ')[0]
+              .split(' doble')[0]
+              .split(' triple')[0]
+              .trim();
+            
+            // Normalize: lowercase, remove extra spaces, remove accents
+            const nombreNormalizado = nombreBase
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/\s+/g, ' ')
+              .trim();
+            
             const current = productMap.get(nombreNormalizado) || { cantidad: 0, ingresos: 0 };
             productMap.set(nombreNormalizado, {
               cantidad: current.cantidad + 1,
