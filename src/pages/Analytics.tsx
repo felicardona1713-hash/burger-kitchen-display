@@ -90,6 +90,7 @@ const Analytics = () => {
               .replace(/[\u0300-\u036f]/g, "")
               .replace(/burguer/g, 'burger')  // Fix common misspelling
               .replace(/hamburguer/g, 'hamburger')  // Fix common misspelling
+              .replace(/cheese\s+burger/g, 'cheeseburger')  // Normalize spacing
               .replace(/\s+/g, ' ')
               .trim();
             
