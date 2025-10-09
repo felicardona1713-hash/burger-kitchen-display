@@ -10,19 +10,24 @@ import { Check, Clock, DollarSign } from "lucide-react";
 
 interface OrderItem {
   quantity: number;
-  name: string;
+  burger_type: string;
+  patty_size: string;
+  combo: boolean;
+  additions?: string[] | null;
+  removals?: string[] | null;
 }
 
 interface ItemStatus {
-  name: string;
+  burger_type: string;
   quantity: number;
+  patty_size: string;
+  combo: boolean;
   completed: boolean;
 }
 
 interface Order {
   id: string;
   nombre: string;
-  pedido: string[];
   total: number;
   fecha: string;
   status: string;
@@ -74,14 +79,15 @@ const Kitchen = () => {
           
           if (payload.eventType === 'INSERT') {
             const newOrder = payload.new as Order;
-            if (newOrder.status === 'pending') {
-              setOrders(prev => [...prev, newOrder]);
-              toast({
-                title: "¡Nuevo Pedido!",
-                description: `${newOrder.nombre} - ${newOrder.pedido}`,
-                duration: 5000,
-              });
-            }
+              if (newOrder.status === 'pending') {
+                setOrders(prev => [...prev, newOrder]);
+                const itemsDesc = newOrder.items?.map(i => `${i.quantity}x ${i.burger_type}`).join(', ') || '';
+                toast({
+                  title: "¡Nuevo Pedido!",
+                  description: `${newOrder.nombre} - ${itemsDesc}`,
+                  duration: 5000,
+                });
+              }
           } else if (payload.eventType === 'UPDATE') {
             const updatedOrder = payload.new as Order;
             setOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
@@ -125,11 +131,12 @@ const Kitchen = () => {
           : o
       ));
       
-      const itemName = updatedItemStatus[itemIndex].name;
-      const action = updatedItemStatus[itemIndex].completed ? "completado" : "pendiente";
+      const item = updatedItemStatus[itemIndex];
+      const itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
+      const action = item.completed ? "completado" : "pendiente";
       toast({
         title: `Item ${action}`,
-        description: `${itemName} marcado como ${action}`,
+        description: `${itemDesc} marcado como ${action}`,
       });
     }
   };
@@ -255,13 +262,14 @@ const Kitchen = () => {
                                     item.completed 
                                       ? "bg-success text-success-foreground hover:bg-success/90" 
                                       : "hover:bg-muted-foreground/10"
-                                  }`}
-                                >
-                                  <Check className={`w-3 h-3 ${item.completed ? "opacity-100" : "opacity-30"}`} />
-                                  <span className={`text-xs ${item.completed ? "line-through" : ""}`}>
-                                    {item.quantity}x {item.name}
-                                  </span>
-                                </Button>
+                                   }`}
+                                 >
+                                   <Check className={`w-3 h-3 ${item.completed ? "opacity-100" : "opacity-30"}`} />
+                                   <span className={`text-xs ${item.completed ? "line-through" : ""}`}>
+                                     {item.quantity}x {item.burger_type} {item.patty_size}
+                                     {item.combo && ' (combo)'}
+                                   </span>
+                                 </Button>
                               </div>
                             ))}
                           </div>
@@ -271,12 +279,23 @@ const Kitchen = () => {
                           <p className="font-medium text-sm text-muted-foreground mb-2">
                             Items del Pedido:
                           </p>
-                          <div className="space-y-1">
+                          <div className="space-y-2">
                             {order.items.map((item, index) => (
-                              <div key={index} className="flex justify-between text-sm">
-                                <span className="text-foreground">
-                                  {item.quantity}x {item.name}
-                                </span>
+                              <div key={index} className="text-sm">
+                                <div className="font-medium text-foreground">
+                                  {item.quantity}x {item.burger_type} {item.patty_size}
+                                  {item.combo && ' 🍟 combo'}
+                                </div>
+                                {item.additions && item.additions.length > 0 && (
+                                  <div className="text-xs text-green-600 ml-4">
+                                    + {item.additions.join(', ')}
+                                  </div>
+                                )}
+                                {item.removals && item.removals.length > 0 && (
+                                  <div className="text-xs text-red-600 ml-4">
+                                    sin {item.removals.join(', ')}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -284,10 +303,7 @@ const Kitchen = () => {
                       ) : (
                        <div className="bg-muted p-3 rounded-md">
                          <p className="font-medium text-sm text-muted-foreground mb-1">
-                           Pedido:
-                         </p>
-                         <p className="text-foreground whitespace-pre-wrap">
-                           {order.pedido}
+                           Sin detalles
                          </p>
                        </div>
                      )}

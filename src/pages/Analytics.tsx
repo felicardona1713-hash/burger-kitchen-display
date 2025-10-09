@@ -9,10 +9,19 @@ import { formatDistance, startOfWeek, startOfMonth, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { TrendingUp, DollarSign, ShoppingBag, Users } from "lucide-react";
 
+interface OrderItem {
+  quantity: number;
+  burger_type: string;
+  patty_size: string;
+  combo: boolean;
+  additions?: string[] | null;
+  removals?: string[] | null;
+}
+
 interface Order {
   id: string;
   nombre: string;
-  pedido: string[];
+  items?: OrderItem[];
   total: number;
   fecha: string;
   status: string;
@@ -58,50 +67,41 @@ const Analytics = () => {
         return;
       }
 
-      const allOrders = ordersData || [];
+      const allOrders = (ordersData || []).map(order => ({
+        ...order,
+        items: Array.isArray(order.items) ? order.items as unknown as OrderItem[] : undefined
+      }));
       setOrders(allOrders);
       setTotalOrders(allOrders.length);
       setTotalRevenue(allOrders.reduce((sum, order) => sum + Number(order.total), 0));
 
-      // Analyze products - extract only hamburger name
-      const productMap = new Map<string, { cantidad: number; ingresos: number }>();
+      // Analyze products from items array
+      const productMap = new Map<string, { cantidad: number; ingresos: number; porTamaño: Record<string, number>; combos: number }>();
       
       allOrders.forEach(order => {
-        const productos = order.pedido; // pedido is now an array
-        productos.forEach(producto => {
-          if (producto) {
-            // Remove "1x", "2x", etc. and any quantity prefix variations
-            let productoLimpio = producto
-              .replace(/^\d+\s*[x×]\s*/i, '')  // Remove "1x ", "2×", etc.
-              .replace(/^\d+\s+/, '')        // Remove standalone numbers
-              .replace(/^[x×]\s+/i, '')      // Remove standalone "x " or "× " at the beginning
-              .trim();
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach(item => {
+            const burgerType = item.burger_type.toLowerCase().trim();
+            const current = productMap.get(burgerType) || { 
+              cantidad: 0, 
+              ingresos: 0,
+              porTamaño: { simple: 0, doble: 0, triple: 0 },
+              combos: 0
+            };
             
-            // Extract base name by removing modifiers
-            let nombreBase = productoLimpio
-              .split(' con ')[0]
-              .split(' doble')[0]
-              .split(' triple')[0]
-              .trim();
+            const itemRevenue = Number(order.total) / order.items.length;
             
-            // Normalize: lowercase, remove extra spaces, remove accents, fix common misspellings
-            const nombreNormalizado = nombreBase
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .replace(/burguer/g, 'burger')  // Fix common misspelling
-              .replace(/hamburguer/g, 'hamburger')  // Fix common misspelling
-              .replace(/cheese\s+burger/g, 'cheeseburger')  // Normalize spacing
-              .replace(/\s+/g, ' ')
-              .trim();
-            
-            const current = productMap.get(nombreNormalizado) || { cantidad: 0, ingresos: 0 };
-            productMap.set(nombreNormalizado, {
-              cantidad: current.cantidad + 1,
-              ingresos: current.ingresos + Number(order.total) / productos.length
+            productMap.set(burgerType, {
+              cantidad: current.cantidad + item.quantity,
+              ingresos: current.ingresos + itemRevenue,
+              porTamaño: {
+                ...current.porTamaño,
+                [item.patty_size]: (current.porTamaño[item.patty_size] || 0) + item.quantity
+              },
+              combos: current.combos + (item.combo ? item.quantity : 0)
             });
-          }
-        });
+          });
+        }
       });
 
       const sortedProducts = Array.from(productMap.entries())
@@ -358,7 +358,7 @@ const Analytics = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Pedido</TableHead>
+                  <TableHead>Items</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Fecha</TableHead>
@@ -368,7 +368,14 @@ const Analytics = () => {
                 {orders.slice(0, 20).map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">{order.nombre}</TableCell>
-                    <TableCell className="max-w-xs truncate">{order.pedido}</TableCell>
+                    <TableCell className="max-w-xs">
+                      {order.items?.map((item, idx) => (
+                        <div key={idx} className="text-sm">
+                          {item.quantity}x {item.burger_type} {item.patty_size}
+                          {item.combo && ' (combo)'}
+                        </div>
+                      ))}
+                    </TableCell>
                     <TableCell>${order.total}</TableCell>
                     <TableCell>
                       <Badge 

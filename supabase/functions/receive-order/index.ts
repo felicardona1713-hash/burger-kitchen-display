@@ -32,7 +32,7 @@ serve(async (req) => {
     // Convert pedido to array if it's a string
     let pedidoArray: string[];
     if (typeof pedido === 'string') {
-      pedidoArray = [pedido];
+      pedidoArray = pedido.split(',').map(p => p.trim());
     } else if (Array.isArray(pedido)) {
       pedidoArray = pedido;
     } else {
@@ -81,32 +81,67 @@ serve(async (req) => {
       });
     }
 
-    // Parse items from pedido array
+    // Parse items from pedido array with detailed metrics
     const parseItemsFromArray = (pedidoArr: string[]) => {
       const allItems = [];
       
       for (const item of pedidoArr) {
         const cleanText = item.toLowerCase().trim();
         
-        // Pattern to extract quantity and name
+        // Pattern to extract quantity
         const quantityMatch = cleanText.match(/^(\d+)\s*[x×]\s*(.+)$/);
+        const quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+        let itemText = quantityMatch ? quantityMatch[2].trim() : cleanText;
         
-        if (quantityMatch) {
-          const quantity = parseInt(quantityMatch[1]);
-          let name = quantityMatch[2].trim();
-          
-          // Clean up name
-          name = name.replace(/\s+para\s+domicilio.*$/i, '').trim();
-          
-          if (name.length > 0) {
-            allItems.push({ quantity, name });
+        // Remove address information
+        itemText = itemText.replace(/\s+para\s+domicilio.*$/i, '').trim();
+        
+        // Extract patty size (simple, doble, triple)
+        let pattySize = 'simple';
+        if (itemText.match(/\btriple\b/i)) {
+          pattySize = 'triple';
+        } else if (itemText.match(/\bdoble\b/i)) {
+          pattySize = 'doble';
+        }
+        
+        // Check if it's a combo (con papas)
+        const isCombo = /\b(?:con papas|en combo|combo)\b/i.test(itemText);
+        
+        // Extract burger type (everything before modifiers)
+        let burgerType = itemText
+          .replace(/\b(?:simple|doble|triple)\b/gi, '')
+          .replace(/\b(?:con papas|en combo|combo)\b/gi, '')
+          .replace(/\bsin\s+\w+/gi, '')
+          .replace(/\bagregado\s+\w+/gi, '')
+          .trim();
+        
+        // Extract removals (sin ...)
+        const removals: string[] = [];
+        const removalMatches = itemText.matchAll(/\bsin\s+(\w+(?:\s+\w+)?)/gi);
+        for (const match of removalMatches) {
+          removals.push(match[1].trim());
+        }
+        
+        // Extract additions (agregado ..., con ... extra, etc.)
+        const additions: string[] = [];
+        const additionMatches = itemText.matchAll(/\b(?:agregado|con|extra)\s+(\w+(?:\s+\w+)?)/gi);
+        for (const match of additionMatches) {
+          const addition = match[1].trim();
+          // Avoid capturing "papas" as an addition if it's part of combo
+          if (addition !== 'papas' && addition !== 'combo') {
+            additions.push(addition);
           }
-        } else {
-          // No quantity specified, assume 1
-          let name = cleanText.replace(/\s+para\s+domicilio.*$/i, '').trim();
-          if (name.length > 0) {
-            allItems.push({ quantity: 1, name });
-          }
+        }
+        
+        if (burgerType.length > 0) {
+          allItems.push({
+            quantity,
+            burger_type: burgerType,
+            patty_size: pattySize,
+            combo: isCombo,
+            additions: additions.length > 0 ? additions : null,
+            removals: removals.length > 0 ? removals : null
+          });
         }
       }
       
@@ -117,8 +152,10 @@ serve(async (req) => {
 
     // Create item_status array for tracking individual item completion
     const itemStatus = items ? items.map(item => ({
-      name: item.name,
+      burger_type: item.burger_type,
       quantity: item.quantity,
+      patty_size: item.patty_size,
+      combo: item.combo,
       completed: false
     })) : null;
 
@@ -127,7 +164,6 @@ serve(async (req) => {
       .from('orders')
       .insert({
         nombre,
-        pedido: pedidoArray,
         monto: monto,
         total: monto,
         items,
@@ -192,11 +228,11 @@ serve(async (req) => {
       addText('ITEMS:', 10, true);
       if (data.items && Array.isArray(data.items)) {
         data.items.forEach((item: any) => {
-          addText(`${item.quantity}x ${item.name}`, 9);
-        });
-      } else if (Array.isArray(data.pedido)) {
-        data.pedido.forEach((item: string) => {
-          addText(item, 9);
+          let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
+          if (item.combo) itemDesc += ' (combo)';
+          if (item.additions) itemDesc += ` +${item.additions.join(', ')}`;
+          if (item.removals) itemDesc += ` sin ${item.removals.join(', ')}`;
+          addText(itemDesc, 9);
         });
       }
       
@@ -235,7 +271,6 @@ serve(async (req) => {
         const webhookPayload = {
           orderId: data.id,
           cliente: data.nombre,
-          pedido: data.pedido,
           items: data.items,
           total: data.monto,
           direccion: data.direccion_envio,
