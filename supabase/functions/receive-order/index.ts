@@ -86,15 +86,18 @@ serve(async (req) => {
       const allItems = [];
       
       for (const item of pedidoArr) {
-        const cleanText = item.toLowerCase().trim();
+        const originalText = item.trim();
+        const cleanText = originalText.toLowerCase();
         
         // Pattern to extract quantity
         const quantityMatch = cleanText.match(/^(\d+)\s*[x×]\s*(.+)$/);
         const quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
         let itemText = quantityMatch ? quantityMatch[2].trim() : cleanText;
+        let originalItemText = quantityMatch ? originalText.replace(/^\d+\s*[x×]\s*/i, '').trim() : originalText;
         
         // Remove address information
         itemText = itemText.replace(/\s+para\s+domicilio.*$/i, '').trim();
+        originalItemText = originalItemText.replace(/\s+para\s+domicilio.*$/i, '').trim();
         
         // Extract patty size (simple, doble, triple)
         let pattySize = 'simple';
@@ -104,39 +107,49 @@ serve(async (req) => {
           pattySize = 'doble';
         }
         
-        // Check if it's a combo (con papas)
-        const isCombo = /\b(?:con papas|en combo|combo)\b/i.test(itemText);
-        
-        // Extract burger type (everything before modifiers)
-        let burgerType = itemText
-          .replace(/\b(?:simple|doble|triple)\b/gi, '')
-          .replace(/\b(?:con papas|en combo|combo)\b/gi, '')
-          .replace(/\bsin\s+\w+/gi, '')
-          .replace(/\bagregado\s+\w+/gi, '')
-          .trim();
+        // Check if it's a combo - if combo is mentioned, it includes fries
+        const isCombo = /\b(?:en combo|combo)\b/i.test(itemText);
         
         // Extract removals (sin ...)
         const removals: string[] = [];
-        const removalMatches = itemText.matchAll(/\bsin\s+(\w+(?:\s+\w+)?)/gi);
+        const removalMatches = itemText.matchAll(/\bsin\s+([\w\s]+?)(?=\s+(?:agregado|con|en|$))/gi);
         for (const match of removalMatches) {
           removals.push(match[1].trim());
         }
         
-        // Extract additions (agregado ..., con ... extra, etc.)
+        // Extract additions (agregado ..., but NOT "con papas" if combo)
         const additions: string[] = [];
-        const additionMatches = itemText.matchAll(/\b(?:agregado|con|extra)\s+(\w+(?:\s+\w+)?)/gi);
+        const additionMatches = itemText.matchAll(/\b(?:agregado|extra)\s+([\w\s]+?)(?=\s+(?:sin|en|$))/gi);
         for (const match of additionMatches) {
-          const addition = match[1].trim();
-          // Avoid capturing "papas" as an addition if it's part of combo
-          if (addition !== 'papas' && addition !== 'combo') {
-            additions.push(addition);
+          additions.push(match[1].trim());
+        }
+        
+        // Also capture "con X" that is NOT "con papas" when it's a combo
+        const conMatches = itemText.matchAll(/\bcon\s+([\w\s]+?)(?=\s+(?:agregado|sin|en|$))/gi);
+        for (const match of conMatches) {
+          const item = match[1].trim();
+          // If it's NOT "papas fritas" or "papas", or if it's papas but NOT in combo context
+          if (!item.match(/^papas(\s+fritas)?$/i) || !isCombo) {
+            if (!additions.includes(item) && item !== 'combo') {
+              additions.push(item);
+            }
           }
         }
         
-        if (burgerType.length > 0) {
+        // Extract burger name - everything before size/modifiers
+        let burgerName = originalItemText
+          .replace(/\b(?:simple|doble|triple)\b/gi, '')
+          .replace(/\b(?:con papas fritas|con papas|en combo|combo)\b/gi, '')
+          .replace(/\bsin\s+[\w\s]+?(?=\s+(?:agregado|con|en|$))/gi, '')
+          .replace(/\bagregado\s+[\w\s]+/gi, '')
+          .replace(/\bextra\s+[\w\s]+/gi, '')
+          .replace(/\bcon\s+[\w\s]+/gi, '')
+          .trim();
+        
+        if (burgerName.length > 0) {
           allItems.push({
             quantity,
-            burger_type: burgerType,
+            burger_type: burgerName,
             patty_size: pattySize,
             combo: isCombo,
             additions: additions.length > 0 ? additions : null,
