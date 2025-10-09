@@ -83,11 +83,13 @@ const Analytics = () => {
               .split(' triple')[0]
               .trim();
             
-            // Normalize: lowercase, remove extra spaces, remove accents
+            // Normalize: lowercase, remove extra spaces, remove accents, fix common misspellings
             const nombreNormalizado = nombreBase
               .toLowerCase()
               .normalize("NFD")
               .replace(/[\u0300-\u036f]/g, "")
+              .replace(/burguer/g, 'burger')  // Fix common misspelling
+              .replace(/hamburguer/g, 'hamburger')  // Fix common misspelling
               .replace(/\s+/g, ' ')
               .trim();
             
