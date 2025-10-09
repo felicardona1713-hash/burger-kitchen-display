@@ -74,6 +74,7 @@ const Analytics = () => {
             let productoLimpio = producto
               .replace(/^\d+\s*x\s*/i, '')  // Remove "1x ", "2 x ", etc.
               .replace(/^\d+\s+/, '')        // Remove standalone numbers
+              .replace(/^x\s+/i, '')         // Remove standalone "x " at the beginning
               .trim();
             
             // Extract base name by removing modifiers
