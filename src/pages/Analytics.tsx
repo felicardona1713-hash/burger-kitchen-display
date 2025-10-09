@@ -70,8 +70,9 @@ const Analytics = () => {
         const productos = order.pedido.split(',').map(p => p.trim());
         productos.forEach(producto => {
           if (producto) {
-            // Extract only the hamburger name (first part before "con", "doble", etc.)
-            const nombreHamburguesa = producto.split(' con ')[0].split(' doble')[0].split(' triple')[0];
+            // Remove "1x", "2x", etc. from the beginning and extract only the hamburger name
+            const productoLimpio = producto.replace(/^\d+x\s*/i, '').trim();
+            const nombreHamburguesa = productoLimpio.split(' con ')[0].split(' doble')[0].split(' triple')[0].trim();
             const current = productMap.get(nombreHamburguesa) || { cantidad: 0, ingresos: 0 };
             productMap.set(nombreHamburguesa, {
               cantidad: current.cantidad + 1,
@@ -280,9 +281,7 @@ const Analytics = () => {
                         {index + 1}
                       </Badge>
                       <div>
-                        <p className="font-medium">
-                          {product.producto.replace(/^\d+x\s*/i, '').trim()}
-                        </p>
+                        <p className="font-medium">{product.producto}</p>
                         <p className="text-sm text-muted-foreground">
                           ${product.ingresos.toFixed(2)} en ingresos
                         </p>
