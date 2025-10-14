@@ -31,6 +31,8 @@ interface Order {
 
 interface ProductStats {
   producto: string;
+  pattySize: string;
+  combo: boolean;
   cantidad: number;
   ingresos: number;
 }
@@ -76,8 +78,8 @@ const Analytics = () => {
       setTotalOrders(allOrders.length);
       setTotalRevenue(allOrders.reduce((sum, order) => sum + Number(order.total), 0));
 
-      // Analyze products from items array
-      const productMap = new Map<string, { cantidad: number; ingresos: number; porTamaño: Record<string, number>; combos: number }>();
+      // Analyze products from items array - group by burger_type + patty_size + combo
+      const productMap = new Map<string, { cantidad: number; ingresos: number; producto: string; pattySize: string; combo: boolean }>();
       
       allOrders.forEach(order => {
         if (order.items && Array.isArray(order.items)) {
@@ -85,32 +87,33 @@ const Analytics = () => {
             // Skip items without burger_type
             if (!item.burger_type) return;
             
-            const burgerType = item.burger_type.toLowerCase().trim();
-            const current = productMap.get(burgerType) || { 
+            const burgerType = item.burger_type.trim();
+            const pattySize = item.patty_size || 'simple';
+            const isCombo = item.combo || false;
+            
+            // Create unique key combining all attributes
+            const key = `${burgerType}-${pattySize}-${isCombo}`;
+            
+            const current = productMap.get(key) || { 
               cantidad: 0, 
               ingresos: 0,
-              porTamaño: { simple: 0, doble: 0, triple: 0 },
-              combos: 0
+              producto: burgerType,
+              pattySize: pattySize,
+              combo: isCombo
             };
             
             const itemRevenue = Number(order.total) / order.items.length;
-            const pattySize = item.patty_size || 'simple';
             
-            productMap.set(burgerType, {
+            productMap.set(key, {
+              ...current,
               cantidad: current.cantidad + (item.quantity || 1),
-              ingresos: current.ingresos + itemRevenue,
-              porTamaño: {
-                ...current.porTamaño,
-                [pattySize]: (current.porTamaño[pattySize] || 0) + (item.quantity || 1)
-              },
-              combos: current.combos + (item.combo ? (item.quantity || 1) : 0)
+              ingresos: current.ingresos + itemRevenue
             });
           });
         }
       });
 
-      const sortedProducts = Array.from(productMap.entries())
-        .map(([producto, stats]) => ({ producto, ...stats }))
+      const sortedProducts = Array.from(productMap.values())
         .sort((a, b) => b.cantidad - a.cantidad);
       
       setProductStats(sortedProducts);
@@ -298,13 +301,16 @@ const Analytics = () => {
             <CardContent>
               <div className="space-y-4">
                 {productStats.slice(0, 5).map((product, index) => (
-                  <div key={product.producto} className="flex items-center justify-between">
+                  <div key={`${product.producto}-${product.pattySize}-${product.combo}`} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Badge variant="secondary" className="w-8 h-8 rounded-full flex items-center justify-center">
                         {index + 1}
                       </Badge>
                       <div>
-                        <p className="font-medium capitalize">{product.producto}</p>
+                        <p className="font-medium">
+                          {product.producto} - {product.pattySize}
+                          {product.combo && ' 🍟'}
+                        </p>
                         <p className="text-sm text-muted-foreground">
                           ${product.ingresos.toFixed(2)} en ingresos
                         </p>
