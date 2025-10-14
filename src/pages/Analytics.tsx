@@ -21,6 +21,7 @@ interface OrderItem {
 interface Order {
   id: string;
   nombre: string;
+  telefono?: string | null;
   items?: OrderItem[];
   total: number;
   fecha: string;
@@ -114,19 +115,15 @@ const Analytics = () => {
       
       setProductStats(sortedProducts);
 
-      // Analyze customers - extract only phone number
+      // Analyze customers - group by phone number
       const customerMap = new Map<string, { totalPedidos: number; totalGastado: number }>();
       
       allOrders.forEach(order => {
-        // Extract only phone number from the "nombre" field
-        let clienteDisplay = order.nombre;
-        if (order.nombre.includes(' - ')) {
-          const parts = order.nombre.split(' - ');
-          clienteDisplay = parts[0]; // Solo el teléfono
-        }
+        // Use phone number as the key, fallback to "Sin teléfono" if not available
+        const clienteKey = order.telefono || "Sin teléfono";
         
-        const current = customerMap.get(clienteDisplay) || { totalPedidos: 0, totalGastado: 0 };
-        customerMap.set(clienteDisplay, {
+        const current = customerMap.get(clienteKey) || { totalPedidos: 0, totalGastado: 0 };
+        customerMap.set(clienteKey, {
           totalPedidos: current.totalPedidos + 1,
           totalGastado: current.totalGastado + Number(order.total)
         });
