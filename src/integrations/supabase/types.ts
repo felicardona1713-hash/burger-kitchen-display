@@ -61,6 +61,7 @@ export type Database = {
           monto: number
           nombre: string
           status: string
+          telefono: string | null
           total: number | null
         }
         Insert: {
@@ -73,6 +74,7 @@ export type Database = {
           monto: number
           nombre: string
           status?: string
+          telefono?: string | null
           total?: number | null
         }
         Update: {
@@ -85,6 +87,7 @@ export type Database = {
           monto?: number
           nombre?: string
           status?: string
+          telefono?: string | null
           total?: number | null
         }
         Relationships: []
