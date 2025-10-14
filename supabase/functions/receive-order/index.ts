@@ -27,7 +27,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const raw = await req.json();
-    let { nombre, pedido, monto } = raw;
+    let { nombre, pedido, monto, telefono } = raw;
     
     // Convert pedido to array if it's a string
     let pedidoArray: string[];
@@ -182,6 +182,7 @@ serve(async (req) => {
         items,
         item_status: itemStatus,
         direccion_envio: direccionEnvio,
+        telefono: telefono || null,
         fecha: new Date().toISOString(),
         status: 'pending'
       })
