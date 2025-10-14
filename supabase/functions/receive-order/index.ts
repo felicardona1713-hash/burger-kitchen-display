@@ -138,6 +138,7 @@ serve(async (req) => {
         
         // Extract burger name - everything before size/modifiers
         let burgerName = originalItemText
+          .replace(/^\d+\s+/g, '') // Remove leading numbers (e.g., "1 cheese burger" -> "cheese burger")
           .replace(/\b(?:simple|doble|triple)\b/gi, '')
           .replace(/\b(?:con papas fritas|con papas|en combo|combo)\b/gi, '')
           .replace(/\bsin\s+[\w\s]+?(?=\s+(?:agregado|con|en|$))/gi, '')
