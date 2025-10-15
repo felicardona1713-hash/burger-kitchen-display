@@ -35,6 +35,7 @@ interface Order {
   items?: OrderItem[];
   item_status?: ItemStatus[];
   direccion_envio?: string;
+  order_number: number;
 }
 
 const Kitchen = () => {
@@ -216,7 +217,12 @@ const Kitchen = () => {
                 >
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
-                      <CardTitle className="text-lg">{order.nombre}</CardTitle>
+                      <div>
+                        <CardTitle className="text-lg">{order.nombre}</CardTitle>
+                        <Badge variant="secondary" className="text-xs mt-1">
+                          Pedido #{order.order_number}
+                        </Badge>
+                      </div>
                       <div className="flex flex-col gap-2 items-end">
                         <Badge 
                           variant={orderAge.urgent ? "destructive" : "secondary"}

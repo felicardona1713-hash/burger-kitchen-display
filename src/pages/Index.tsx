@@ -36,6 +36,7 @@ interface Order {
   items?: OrderItem[];
   item_status?: ItemStatus[];
   direccion_envio?: string;
+  order_number: number;
 }
 
 const Index = () => {
@@ -308,7 +309,7 @@ const Index = () => {
           
           <div class="order ${orderAge.urgent ? 'urgent' : ''}">
             <div class="order-header">
-              PEDIDO - ${order.nombre}
+              PEDIDO #${order.order_number} - ${order.nombre}
             </div>
             <div class="order-time">
               Tiempo: ${orderAge.text} ${orderAge.urgent ? '⚠️ URGENTE' : ''}
@@ -490,7 +491,7 @@ const Index = () => {
             return `
               <div class="order ${orderAge.urgent ? 'urgent' : ''}">
                 <div class="order-header">
-                  PEDIDO #${index + 1} - ${order.nombre}
+                  PEDIDO #${order.order_number} - ${order.nombre}
                 </div>
                 <div class="order-time">
                   Tiempo: ${orderAge.text} ${orderAge.urgent ? '⚠️ URGENTE' : ''}
@@ -577,7 +578,12 @@ const Index = () => {
       >
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start">
-            <CardTitle className="text-lg">{order.nombre}</CardTitle>
+            <div>
+              <CardTitle className="text-lg">{order.nombre}</CardTitle>
+              <Badge variant="secondary" className="text-xs mt-1">
+                Pedido #{order.order_number}
+              </Badge>
+            </div>
             <div className="flex flex-col gap-2 items-end">
               {showCompleteButton && (
                 <Badge 
