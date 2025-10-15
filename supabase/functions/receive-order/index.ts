@@ -27,7 +27,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const raw = await req.json();
-    let { nombre, pedido, monto, telefono } = raw;
+    let { nombre, pedido, monto, telefono, order_number } = raw;
     
     // Convert pedido to array if it's a string
     let pedidoArray: string[];
@@ -174,19 +174,26 @@ serve(async (req) => {
     })) : null;
 
     // Insert the order into the database
+    const orderData: any = {
+      nombre,
+      monto: monto,
+      total: monto,
+      items,
+      item_status: itemStatus,
+      direccion_envio: direccionEnvio,
+      telefono: telefono || null,
+      fecha: new Date().toISOString(),
+      status: 'pending'
+    };
+    
+    // If order_number is provided, include it (otherwise the trigger will set it)
+    if (order_number !== undefined && order_number !== null) {
+      orderData.order_number = order_number;
+    }
+    
     const { data, error } = await supabase
       .from('orders')
-      .insert({
-        nombre,
-        monto: monto,
-        total: monto,
-        items,
-        item_status: itemStatus,
-        direccion_envio: direccionEnvio,
-        telefono: telefono || null,
-        fecha: new Date().toISOString(),
-        status: 'pending'
-      })
+      .insert(orderData)
       .select()
       .single();
 
