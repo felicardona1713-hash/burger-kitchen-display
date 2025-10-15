@@ -27,7 +27,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const raw = await req.json();
-    let { nombre, pedido, monto, telefono, order_number } = raw;
+    let { nombre, pedido, monto, telefono, order_id } = raw;
     
     // Convert pedido to array if it's a string
     let pedidoArray: string[];
@@ -186,9 +186,9 @@ serve(async (req) => {
       status: 'pending'
     };
     
-    // If order_number is provided, include it (otherwise the trigger will set it)
-    if (order_number !== undefined && order_number !== null) {
-      orderData.order_number = order_number;
+    // If order_id is provided, include it (otherwise the trigger will set it)
+    if (order_id !== undefined && order_id !== null) {
+      orderData.order_number = order_id;
     }
     
     const { data, error } = await supabase
