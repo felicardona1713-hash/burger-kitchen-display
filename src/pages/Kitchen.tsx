@@ -27,6 +27,7 @@ interface ItemStatus {
 
 interface Order {
   id: string;
+  order_number: number;
   nombre: string;
   total: number;
   fecha: string;
@@ -35,7 +36,6 @@ interface Order {
   items?: OrderItem[];
   item_status?: ItemStatus[];
   direccion_envio?: string;
-  order_number: number;
 }
 
 const Kitchen = () => {
