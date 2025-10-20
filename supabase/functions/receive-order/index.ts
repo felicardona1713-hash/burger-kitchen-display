@@ -173,6 +173,21 @@ serve(async (req) => {
       completed: false
     })) : null;
 
+    // Get the next order number
+    const { data: orderNumberData, error: orderNumberError } = await supabase
+      .rpc('get_daily_order_number');
+    
+    if (orderNumberError) {
+      console.error('Error getting order number:', orderNumberError);
+      return new Response(JSON.stringify({ error: 'Error generating order number' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    const orderNumber = orderNumberData;
+    console.log('Generated order number:', orderNumber);
+
     // Insert the order into the database
     const orderData: any = {
       nombre,
@@ -183,13 +198,9 @@ serve(async (req) => {
       direccion_envio: direccionEnvio,
       telefono: telefono || null,
       fecha: new Date().toISOString(),
-      status: 'pending'
+      status: 'pending',
+      order_number: orderNumber
     };
-    
-    // If order_id is provided, include it (otherwise the trigger will set it)
-    if (order_id !== undefined && order_id !== null) {
-      orderData.order_number = order_id;
-    }
     
     const { data, error } = await supabase
       .from('orders')
@@ -300,7 +311,9 @@ serve(async (req) => {
         orderId: data.id,
         orderNumber: data.order_number,
         items: data.items,
-        pdfBase64: kitchenPdfBase64
+        pdfBase64: kitchenPdfBase64,
+        cliente: data.nombre,
+        telefono: data.telefono
       };
       
       const kitchenResponse = await fetch(kitchenWebhookUrl, {
