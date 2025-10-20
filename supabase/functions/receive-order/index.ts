@@ -207,12 +207,12 @@ serve(async (req) => {
 
     console.log('Order received and saved:', data);
     
-    // Generate PDF and send to webhook
-    const webhookUrl = Deno.env.get('N8N_WEBHOOK_URL');
-    let pdfBase64 = null;
+    // Generate PDFs for kitchen and cashier
+    const kitchenWebhookUrl = 'https://n8nfrontx.botec.tech/webhook-test/crearFacturaCocina';
+    const cashierWebhookUrl = 'https://n8nfrontx.botec.tech/webhook-test/crearFacturaCaja';
     
-    try {
-      // Generate PDF
+    // Helper function to generate PDF
+    const generatePDF = async (type: 'kitchen' | 'cashier') => {
       const pdfDoc = await PDFDocument.create();
       const page = pdfDoc.addPage([226, 400]); // 80mm width
       const font = await pdfDoc.embedFont(StandardFonts.Courier);
@@ -234,8 +234,115 @@ serve(async (req) => {
         yPosition -= lineHeight + (bold ? 2 : 0);
       };
       
-      // PDF Content
-      console.log('Generating PDF with order_number:', data.order_number);
+      if (type === 'kitchen') {
+        // Kitchen PDF - Only order number and items
+        addText('COCINA', 14, true);
+        addText('================================', 8);
+        addText(`PEDIDO #${data.order_number}`, 12, true);
+        addText('================================', 8);
+        
+        addText('ITEMS:', 10, true);
+        if (data.items && Array.isArray(data.items)) {
+          data.items.forEach((item: any) => {
+            let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
+            if (item.combo) itemDesc += ' (combo)';
+            if (item.additions) itemDesc += ` +${item.additions.join(', ')}`;
+            if (item.removals) itemDesc += ` sin ${item.removals.join(', ')}`;
+            addText(itemDesc, 9);
+          });
+        }
+        addText('================================', 8);
+      } else {
+        // Cashier PDF - Full order with phone
+        addText('ROSES BURGERS', 14, true);
+        addText('================================', 8);
+        addText(`PEDIDO #${data.order_number}`, 12, true);
+        addText(`Fecha: ${new Date(data.fecha).toLocaleString('es-AR')}`, 8);
+        addText('================================', 8);
+        
+        addText(`Cliente: ${data.nombre}`, 10);
+        if (data.telefono) {
+          addText(`Telefono: ${data.telefono}`, 9);
+        }
+        if (data.direccion_envio) {
+          addText(`Direccion: ${data.direccion_envio}`, 8);
+        }
+        addText('--------------------------------', 8);
+        
+        addText('ITEMS:', 10, true);
+        if (data.items && Array.isArray(data.items)) {
+          data.items.forEach((item: any) => {
+            let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
+            if (item.combo) itemDesc += ' (combo)';
+            if (item.additions) itemDesc += ` +${item.additions.join(', ')}`;
+            if (item.removals) itemDesc += ` sin ${item.removals.join(', ')}`;
+            addText(itemDesc, 9);
+          });
+        }
+        
+        addText('--------------------------------', 8);
+        addText(`TOTAL: $${data.monto}`, 12, true);
+        addText('================================', 8);
+        addText('Gracias por su compra!', 8);
+      }
+      
+      const pdfBytes = await pdfDoc.save();
+      return btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
+    };
+    
+    // Generate both PDFs and send to webhooks
+    try {
+      console.log('Generating kitchen PDF with order_number:', data.order_number);
+      const kitchenPdfBase64 = await generatePDF('kitchen');
+      
+      // Send to kitchen webhook
+      const kitchenPayload = {
+        orderId: data.id,
+        orderNumber: data.order_number,
+        items: data.items,
+        pdfBase64: kitchenPdfBase64
+      };
+      
+      const kitchenResponse = await fetch(kitchenWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(kitchenPayload)
+      });
+      
+      if (kitchenResponse.ok) {
+        console.log('Kitchen webhook sent successfully');
+      } else {
+        console.error('Kitchen webhook error:', await kitchenResponse.text());
+      }
+    } catch (error) {
+      console.error('Kitchen PDF/webhook error:', error);
+    }
+    
+    try {
+      console.log('Generating cashier PDF with order_number:', data.order_number);
+      const cashierPdfBase64 = await generatePDF('cashier');
+      
+      // Upload cashier PDF to storage
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([226, 400]);
+      const font = await pdfDoc.embedFont(StandardFonts.Courier);
+      
+      const { width, height } = page.getSize();
+      let yPosition = height - 30;
+      const lineHeight = 12;
+      const margin = 10;
+      
+      const addText = (text: string, size = 10, bold = false) => {
+        page.drawText(text, {
+          x: margin,
+          y: yPosition,
+          size,
+          font,
+          color: rgb(0, 0, 0),
+        });
+        yPosition -= lineHeight + (bold ? 2 : 0);
+      };
+      
       addText('ROSES BURGERS', 14, true);
       addText('================================', 8);
       addText(`PEDIDO #${data.order_number}`, 12, true);
@@ -243,6 +350,9 @@ serve(async (req) => {
       addText('================================', 8);
       
       addText(`Cliente: ${data.nombre}`, 10);
+      if (data.telefono) {
+        addText(`Telefono: ${data.telefono}`, 9);
+      }
       if (data.direccion_envio) {
         addText(`Direccion: ${data.direccion_envio}`, 8);
       }
@@ -265,11 +375,7 @@ serve(async (req) => {
       addText('Gracias por su compra!', 8);
       
       const pdfBytes = await pdfDoc.save();
-      pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
       
-      console.log('PDF generated successfully');
-      
-      // Upload PDF to storage
       const fileName = `invoice-${data.id}.pdf`;
       const { error: uploadError } = await supabase.storage
         .from('invoices')
@@ -284,46 +390,39 @@ serve(async (req) => {
         console.log('PDF uploaded successfully:', fileName);
       }
       
-    } catch (pdfError) {
-      console.error('PDF generation error:', pdfError);
-    }
-    
-    // Send to webhook if URL is configured
-    if (webhookUrl && pdfBase64) {
-      try {
-        const webhookPayload = {
-          orderId: data.id,
-          cliente: data.nombre,
-          items: data.items,
-          total: data.monto,
-          direccion: data.direccion_envio,
-          fecha: data.fecha,
-          pdfBase64: pdfBase64
-        };
-        
-        const webhookResponse = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(webhookPayload)
-        });
-        
-        if (webhookResponse.ok) {
-          console.log('Webhook sent successfully');
-        } else {
-          console.error('Webhook error:', await webhookResponse.text());
-        }
-      } catch (webhookError) {
-        console.error('Webhook send error:', webhookError);
+      // Send to cashier webhook
+      const cashierPayload = {
+        orderId: data.id,
+        orderNumber: data.order_number,
+        cliente: data.nombre,
+        telefono: data.telefono,
+        items: data.items,
+        total: data.monto,
+        direccion: data.direccion_envio,
+        fecha: data.fecha,
+        pdfBase64: cashierPdfBase64
+      };
+      
+      const cashierResponse = await fetch(cashierWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cashierPayload)
+      });
+      
+      if (cashierResponse.ok) {
+        console.log('Cashier webhook sent successfully');
+      } else {
+        console.error('Cashier webhook error:', await cashierResponse.text());
       }
+    } catch (error) {
+      console.error('Cashier PDF/webhook error:', error);
     }
     
     return new Response(JSON.stringify({ 
       success: true, 
       message: 'Order received successfully',
       order: data,
-      pdfGenerated: !!pdfBase64
+      pdfGenerated: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
