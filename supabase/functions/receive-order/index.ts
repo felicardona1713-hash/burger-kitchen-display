@@ -173,50 +173,104 @@ serve(async (req) => {
       completed: false
     })) : null;
 
-    // Get the next order number
-    const { data: orderNumberData, error: orderNumberError } = await supabase
-      .rpc('get_daily_order_number');
-    
-    if (orderNumberError) {
-      console.error('Error getting order number:', orderNumberError);
-      return new Response(JSON.stringify({ error: 'Error generating order number' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    
-    const orderNumber = orderNumberData;
-    console.log('Generated order number:', orderNumber);
-
-    // Insert the order into the database
-    const orderData: any = {
-      nombre,
-      monto: monto,
-      total: monto,
-      items,
-      item_status: itemStatus,
-      direccion_envio: direccionEnvio,
-      telefono: telefono || null,
-      fecha: new Date().toISOString(),
-      status: 'pending',
-      order_number: orderNumber
-    };
-    
-    const { data, error } = await supabase
-      .from('orders')
-      .insert(orderData)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return new Response(JSON.stringify({ error: 'Database error' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Check if there's a recent pending order from the same phone number (within 40 minutes)
+    let existingOrder = null;
+    if (telefono) {
+      const fortyMinutesAgo = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+      
+      const { data: recentOrders, error: searchError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('telefono', telefono)
+        .eq('status', 'pending')
+        .gte('created_at', fortyMinutesAgo)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (!searchError && recentOrders && recentOrders.length > 0) {
+        existingOrder = recentOrders[0];
+        console.log('Found existing order:', existingOrder.id, 'order_number:', existingOrder.order_number);
+      }
     }
 
-    console.log('Order received and saved:', data);
+    let data;
+    let newItems = items;
+    
+    if (existingOrder) {
+      // Update existing order by adding new items
+      const updatedItems = [...(existingOrder.items || []), ...(items || [])];
+      const updatedItemStatus = [...(existingOrder.item_status || []), ...(itemStatus || [])];
+      const updatedTotal = parseFloat(existingOrder.total || 0) + parseFloat(monto);
+      
+      const { data: updatedData, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          items: updatedItems,
+          item_status: updatedItemStatus,
+          total: updatedTotal,
+          monto: updatedTotal
+        })
+        .eq('id', existingOrder.id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Update error:', updateError);
+        return new Response(JSON.stringify({ error: 'Error updating order' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      data = updatedData;
+      console.log('Order updated with new items:', data);
+    } else {
+      // Get the next order number
+      const { data: orderNumberData, error: orderNumberError } = await supabase
+        .rpc('get_daily_order_number');
+      
+      if (orderNumberError) {
+        console.error('Error getting order number:', orderNumberError);
+        return new Response(JSON.stringify({ error: 'Error generating order number' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      const orderNumber = orderNumberData;
+      console.log('Generated order number:', orderNumber);
+
+      // Insert new order into the database
+      const orderData: any = {
+        nombre,
+        monto: monto,
+        total: monto,
+        items,
+        item_status: itemStatus,
+        direccion_envio: direccionEnvio,
+        telefono: telefono || null,
+        fecha: new Date().toISOString(),
+        status: 'pending',
+        order_number: orderNumber
+      };
+      
+      const { data: newData, error } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database error:', error);
+        return new Response(JSON.stringify({ error: 'Database error' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      data = newData;
+      console.log('New order created:', data);
+    }
     
     // Generate PDFs for kitchen and cashier
     const kitchenWebhookUrl = 'https://n8nfrontx.botec.tech/webhook-test/crearFacturaCocina';
@@ -246,15 +300,16 @@ serve(async (req) => {
       };
       
       if (type === 'kitchen') {
-        // Kitchen PDF - Only order number and items
+        // Kitchen PDF - Only order number and NEW items (not all items)
         addText('COCINA', 14, true);
         addText('================================', 8);
         addText(`PEDIDO #${data.order_number}`, 12, true);
         addText('================================', 8);
         
-        addText('ITEMS:', 10, true);
-        if (data.items && Array.isArray(data.items)) {
-          data.items.forEach((item: any) => {
+        addText('ITEMS NUEVOS:', 10, true);
+        // Only print the new items that were just added
+        if (newItems && Array.isArray(newItems)) {
+          newItems.forEach((item: any) => {
             let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
             if (item.combo) itemDesc += ' (combo)';
             if (item.additions) itemDesc += ` +${item.additions.join(', ')}`;
@@ -264,7 +319,7 @@ serve(async (req) => {
         }
         addText('================================', 8);
       } else {
-        // Cashier PDF - Full order with phone
+        // Cashier PDF - Full order with ALL items (updated total)
         addText('ROSES BURGERS', 14, true);
         addText('================================', 8);
         addText(`PEDIDO #${data.order_number}`, 12, true);
@@ -281,6 +336,7 @@ serve(async (req) => {
         addText('--------------------------------', 8);
         
         addText('ITEMS:', 10, true);
+        // Print ALL items (complete order)
         if (data.items && Array.isArray(data.items)) {
           data.items.forEach((item: any) => {
             let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
@@ -292,7 +348,7 @@ serve(async (req) => {
         }
         
         addText('--------------------------------', 8);
-        addText(`TOTAL: $${data.monto}`, 12, true);
+        addText(`TOTAL: $${data.total}`, 12, true);
         addText('================================', 8);
         addText('Gracias por su compra!', 8);
       }
@@ -310,10 +366,11 @@ serve(async (req) => {
       const kitchenPayload = {
         orderId: data.id,
         orderNumber: data.order_number,
-        items: data.items,
+        items: newItems, // Only new items for kitchen
         pdfBase64: kitchenPdfBase64,
         cliente: data.nombre,
-        telefono: data.telefono
+        telefono: data.telefono,
+        isUpdate: !!existingOrder
       };
       
       const kitchenResponse = await fetch(kitchenWebhookUrl, {
@@ -383,7 +440,7 @@ serve(async (req) => {
       }
       
       addText('--------------------------------', 8);
-      addText(`TOTAL: $${data.monto}`, 12, true);
+      addText(`TOTAL: $${data.total}`, 12, true);
       addText('================================', 8);
       addText('Gracias por su compra!', 8);
       
@@ -409,11 +466,12 @@ serve(async (req) => {
         orderNumber: data.order_number,
         cliente: data.nombre,
         telefono: data.telefono,
-        items: data.items,
-        total: data.monto,
+        items: data.items, // All items for cashier
+        total: data.total,
         direccion: data.direccion_envio,
         fecha: data.fecha,
-        pdfBase64: cashierPdfBase64
+        pdfBase64: cashierPdfBase64,
+        isUpdate: !!existingOrder
       };
       
       const cashierResponse = await fetch(cashierWebhookUrl, {
