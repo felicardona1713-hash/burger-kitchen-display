@@ -237,7 +237,7 @@ serve(async (req) => {
       // PDF Content
       addText('ROSES BURGERS', 14, true);
       addText('================================', 8);
-      addText(`PEDIDO #${data.id.slice(-8)}`, 12, true);
+      addText(`PEDIDO #${data.order_number}`, 12, true);
       addText(`Fecha: ${new Date(data.fecha).toLocaleString('es-AR')}`, 8);
       addText('================================', 8);
       
