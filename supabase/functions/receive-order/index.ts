@@ -235,6 +235,7 @@ serve(async (req) => {
       };
       
       // PDF Content
+      console.log('Generating PDF with order_number:', data.order_number);
       addText('ROSES BURGERS', 14, true);
       addText('================================', 8);
       addText(`PEDIDO #${data.order_number}`, 12, true);
