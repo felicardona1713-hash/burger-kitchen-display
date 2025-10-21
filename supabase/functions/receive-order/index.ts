@@ -197,10 +197,62 @@ serve(async (req) => {
     let newItems = items;
     
     if (existingOrder) {
-      // Update existing order by adding new items
-      const updatedItems = [...(existingOrder.items || []), ...(items || [])];
-      const updatedItemStatus = [...(existingOrder.item_status || []), ...(itemStatus || [])];
-      const updatedTotal = parseFloat(existingOrder.total || 0) + parseFloat(monto);
+      // Deduplicate items - only add items that are truly new
+      const existingItems = existingOrder.items || [];
+      const incomingItems = items || [];
+      
+      // Find truly new items by comparing with existing ones
+      const reallyNewItems = [];
+      for (const incomingItem of incomingItems) {
+        // Count how many times this item appears in existing order
+        const existingCount = existingItems.filter(ei => 
+          ei.burger_type === incomingItem.burger_type &&
+          ei.patty_size === incomingItem.patty_size &&
+          ei.combo === incomingItem.combo &&
+          JSON.stringify(ei.additions) === JSON.stringify(incomingItem.additions) &&
+          JSON.stringify(ei.removals) === JSON.stringify(incomingItem.removals)
+        ).reduce((sum, item) => sum + item.quantity, 0);
+        
+        // Count how many times we've already processed this item as new
+        const alreadyAddedCount = reallyNewItems.filter(ni =>
+          ni.burger_type === incomingItem.burger_type &&
+          ni.patty_size === incomingItem.patty_size &&
+          ni.combo === incomingItem.combo &&
+          JSON.stringify(ni.additions) === JSON.stringify(incomingItem.additions) &&
+          JSON.stringify(ni.removals) === JSON.stringify(incomingItem.removals)
+        ).reduce((sum, item) => sum + item.quantity, 0);
+        
+        // Count in incoming request
+        const incomingCount = incomingItem.quantity;
+        
+        // Only add if incoming count is greater than existing + already added
+        const newQuantity = incomingCount - existingCount - alreadyAddedCount;
+        if (newQuantity > 0) {
+          reallyNewItems.push({
+            ...incomingItem,
+            quantity: newQuantity
+          });
+        }
+      }
+      
+      // Calculate the actual new amount based on truly new items
+      const actualNewAmount = reallyNewItems.length > 0 ? parseFloat(monto) * (reallyNewItems.reduce((sum, item) => sum + item.quantity, 0) / incomingItems.reduce((sum, item) => sum + item.quantity, 0)) : 0;
+      
+      newItems = reallyNewItems;
+      
+      // Update existing order by adding only truly new items
+      const updatedItems = [...existingItems, ...reallyNewItems];
+      const updatedItemStatus = [
+        ...(existingOrder.item_status || []), 
+        ...reallyNewItems.map(item => ({
+          burger_type: item.burger_type,
+          quantity: item.quantity,
+          patty_size: item.patty_size,
+          combo: item.combo,
+          completed: false
+        }))
+      ];
+      const updatedTotal = parseFloat(existingOrder.total || 0) + actualNewAmount;
       
       const { data: updatedData, error: updateError } = await supabase
         .from('orders')
