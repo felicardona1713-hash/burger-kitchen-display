@@ -37,6 +37,7 @@ interface Order {
   item_status?: ItemStatus[];
   direccion_envio?: string;
   order_number: number;
+  metodo_pago?: string;
 }
 
 const Index = () => {
@@ -597,6 +598,12 @@ const Index = () => {
               <Badge variant="outline" className="text-xs">
                 <DollarSign className="w-3 h-3 mr-1" />
                 ${order.total}
+              </Badge>
+              <Badge 
+                variant={order.metodo_pago === 'transferencia' ? 'default' : 'secondary'}
+                className="text-xs"
+              >
+                {order.metodo_pago === 'transferencia' ? '💳' : '💵'} {order.metodo_pago || 'efectivo'}
               </Badge>
             </div>
           </div>
