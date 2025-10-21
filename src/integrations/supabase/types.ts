@@ -58,6 +58,7 @@ export type Database = {
           id: string
           item_status: Json | null
           items: Json | null
+          metodo_pago: string | null
           monto: number
           nombre: string
           order_number: number
@@ -72,6 +73,7 @@ export type Database = {
           id?: string
           item_status?: Json | null
           items?: Json | null
+          metodo_pago?: string | null
           monto: number
           nombre: string
           order_number?: number
@@ -86,6 +88,7 @@ export type Database = {
           id?: string
           item_status?: Json | null
           items?: Json | null
+          metodo_pago?: string | null
           monto?: number
           nombre?: string
           order_number?: number

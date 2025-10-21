@@ -1,0 +1,10 @@
+{
+  "nombre": "Felipe",
+  "telefono": "5493413853145",
+  "monto": 13500,
+  "metodo_pago": "efectivo",
+  "pedido": [
+    "1 Crispy Garlic doble en combo sin cebolla",
+    "1 Ruby Clove triple con papas fritas agregado queso extra"
+  ]
+}

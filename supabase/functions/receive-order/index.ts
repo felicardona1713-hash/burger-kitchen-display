@@ -27,7 +27,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const raw = await req.json();
-    let { nombre, pedido, monto, telefono, order_id } = raw;
+    let { nombre, pedido, monto, telefono, order_id, metodo_pago } = raw;
     
     // Convert pedido to array if it's a string
     let pedidoArray: string[];
@@ -303,7 +303,8 @@ serve(async (req) => {
         telefono: telefono || null,
         fecha: new Date().toISOString(),
         status: 'pending',
-        order_number: orderNumber
+        order_number: orderNumber,
+        metodo_pago: metodo_pago || 'efectivo'
       };
       
       const { data: newData, error } = await supabase
@@ -422,7 +423,8 @@ serve(async (req) => {
         pdfBase64: kitchenPdfBase64,
         cliente: data.nombre,
         telefono: data.telefono,
-        isUpdate: !!existingOrder
+        isUpdate: !!existingOrder,
+        metodo_pago: data.metodo_pago
       };
       
       const kitchenResponse = await fetch(kitchenWebhookUrl, {
@@ -523,7 +525,8 @@ serve(async (req) => {
         direccion: data.direccion_envio,
         fecha: data.fecha,
         pdfBase64: cashierPdfBase64,
-        isUpdate: !!existingOrder
+        isUpdate: !!existingOrder,
+        metodo_pago: data.metodo_pago
       };
       
       const cashierResponse = await fetch(cashierWebhookUrl, {
