@@ -326,8 +326,8 @@ serve(async (req) => {
     }
     
     // Generate PDFs for kitchen and cashier
-    const kitchenWebhookUrl = 'https://n8nfrontx.botec.tech/webhook-test/crearFacturaCocina';
-    const cashierWebhookUrl = 'https://n8nfrontx.botec.tech/webhook-test/crearFacturaCaja';
+    const kitchenWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCocina';
+    const cashierWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCaja';
     
     // Helper function to generate PDF
     const generatePDF = async (type: 'kitchen' | 'cashier') => {
