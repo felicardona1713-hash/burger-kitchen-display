@@ -27,7 +27,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const raw = await req.json();
-    let { nombre, pedido, monto, telefono, order_id, metodo_pago } = raw;
+    let { nombre, pedido, monto, telefono, order_id, metodo_pago, items_to_remove } = raw;
     
     // Convert pedido to array if it's a string
     let pedidoArray: string[];
@@ -195,10 +195,70 @@ serve(async (req) => {
 
     let data;
     let newItems = items;
+    let removedItems = [];
     
     if (existingOrder) {
+      // Process item removals if provided
+      let currentItems = [...(existingOrder.items || [])];
+      let currentItemStatus = [...(existingOrder.item_status || [])];
+      let amountToSubtract = 0;
+      
+      if (items_to_remove && Array.isArray(items_to_remove)) {
+        // Parse items to remove
+        const itemsToRemoveArray = items_to_remove.map(item => 
+          typeof item === 'string' ? item : item
+        );
+        const parsedItemsToRemove = parseItemsFromArray(itemsToRemoveArray);
+        
+        if (parsedItemsToRemove && parsedItemsToRemove.length > 0) {
+          for (const itemToRemove of parsedItemsToRemove) {
+            // Find matching items in current order
+            let quantityToRemove = itemToRemove.quantity;
+            
+            for (let i = currentItems.length - 1; i >= 0 && quantityToRemove > 0; i--) {
+              const currentItem = currentItems[i];
+              
+              // Check if items match
+              if (currentItem.burger_type === itemToRemove.burger_type &&
+                  currentItem.patty_size === itemToRemove.patty_size &&
+                  currentItem.combo === itemToRemove.combo &&
+                  JSON.stringify(currentItem.additions) === JSON.stringify(itemToRemove.additions) &&
+                  JSON.stringify(currentItem.removals) === JSON.stringify(itemToRemove.removals)) {
+                
+                const removedQuantity = Math.min(currentItem.quantity, quantityToRemove);
+                
+                // Track removed items for kitchen notification
+                removedItems.push({
+                  ...currentItem,
+                  quantity: removedQuantity
+                });
+                
+                if (currentItem.quantity <= quantityToRemove) {
+                  // Remove entire item
+                  currentItems.splice(i, 1);
+                  currentItemStatus.splice(i, 1);
+                  quantityToRemove -= currentItem.quantity;
+                } else {
+                  // Reduce quantity
+                  currentItems[i].quantity -= quantityToRemove;
+                  currentItemStatus[i].quantity -= quantityToRemove;
+                  quantityToRemove = 0;
+                }
+              }
+            }
+          }
+          
+          // Calculate amount to subtract based on proportion of items removed
+          const totalOriginalQuantity = (existingOrder.items || []).reduce((sum, item) => sum + item.quantity, 0);
+          const totalRemovedQuantity = removedItems.reduce((sum, item) => sum + item.quantity, 0);
+          amountToSubtract = totalOriginalQuantity > 0 
+            ? parseFloat(existingOrder.total || 0) * (totalRemovedQuantity / totalOriginalQuantity)
+            : 0;
+        }
+      }
+      
       // Deduplicate items - only add items that are truly new
-      const existingItems = existingOrder.items || [];
+      const existingItems = currentItems;
       const incomingItems = items || [];
       
       // Find truly new items by comparing with existing ones
@@ -241,9 +301,9 @@ serve(async (req) => {
       newItems = reallyNewItems;
       
       // Update existing order by adding only truly new items
-      const updatedItems = [...existingItems, ...reallyNewItems];
+      const updatedItems = [...currentItems, ...reallyNewItems];
       const updatedItemStatus = [
-        ...(existingOrder.item_status || []), 
+        ...currentItemStatus, 
         ...reallyNewItems.map(item => ({
           burger_type: item.burger_type,
           quantity: item.quantity,
@@ -252,7 +312,7 @@ serve(async (req) => {
           completed: false
         }))
       ];
-      const updatedTotal = parseFloat(existingOrder.total || 0) + actualNewAmount;
+      const updatedTotal = parseFloat(existingOrder.total || 0) + actualNewAmount - amountToSubtract;
       
       const { data: updatedData, error: updateError } = await supabase
         .from('orders')
@@ -353,17 +413,30 @@ serve(async (req) => {
       };
       
       if (type === 'kitchen') {
-        // Kitchen PDF - Only order number and NEW items (not all items)
+        // Kitchen PDF - Only order number and NEW/REMOVED items
         addText('COCINA', 14, true);
         addText('================================', 8);
         addText(`PEDIDO #${data.order_number}`, 12, true);
         addText('================================', 8);
         
-        addText('ITEMS NUEVOS:', 10, true);
-        // Only print the new items that were just added
-        if (newItems && Array.isArray(newItems)) {
+        // Print removed items first if any
+        if (removedItems && removedItems.length > 0) {
+          addText('ITEMS CANCELADOS:', 10, true);
+          removedItems.forEach((item: any) => {
+            let itemDesc = `(-) ${item.quantity}x ${item.burger_type} ${item.patty_size}`;
+            if (item.combo) itemDesc += ' (combo)';
+            if (item.additions) itemDesc += ` +${item.additions.join(', ')}`;
+            if (item.removals) itemDesc += ` sin ${item.removals.join(', ')}`;
+            addText(itemDesc, 9);
+          });
+          addText('--------------------------------', 8);
+        }
+        
+        // Print new items if any
+        if (newItems && Array.isArray(newItems) && newItems.length > 0) {
+          addText('ITEMS NUEVOS:', 10, true);
           newItems.forEach((item: any) => {
-            let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
+            let itemDesc = `(+) ${item.quantity}x ${item.burger_type} ${item.patty_size}`;
             if (item.combo) itemDesc += ' (combo)';
             if (item.additions) itemDesc += ` +${item.additions.join(', ')}`;
             if (item.removals) itemDesc += ` sin ${item.removals.join(', ')}`;
@@ -420,6 +493,7 @@ serve(async (req) => {
         orderId: data.id,
         orderNumber: data.order_number,
         items: newItems, // Only new items for kitchen
+        removedItems: removedItems, // Items that were removed
         pdfBase64: kitchenPdfBase64,
         cliente: data.nombre,
         telefono: data.telefono,
