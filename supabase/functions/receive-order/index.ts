@@ -389,6 +389,9 @@ serve(async (req) => {
     const kitchenWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCocina';
     const cashierWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCaja';
     
+    // Track webhook errors
+    const webhookErrors = [];
+    
     // Helper function to generate PDF
     const generatePDF = async (type: 'kitchen' | 'cashier') => {
       const pdfDoc = await PDFDocument.create();
@@ -507,13 +510,16 @@ serve(async (req) => {
         body: JSON.stringify(kitchenPayload)
       });
       
-      if (kitchenResponse.ok) {
-        console.log('Kitchen webhook sent successfully');
+      if (!kitchenResponse.ok) {
+        const errorText = await kitchenResponse.text();
+        console.error('Kitchen webhook error:', errorText);
+        webhookErrors.push({ webhook: 'kitchen', error: errorText });
       } else {
-        console.error('Kitchen webhook error:', await kitchenResponse.text());
+        console.log('Kitchen webhook sent successfully');
       }
     } catch (error) {
       console.error('Kitchen PDF/webhook error:', error);
+      webhookErrors.push({ webhook: 'kitchen', error: error.message });
     }
     
     try {
@@ -603,27 +609,42 @@ serve(async (req) => {
         metodo_pago: data.metodo_pago
       };
       
-      const cashierResponse = await fetch(cashierWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cashierPayload)
-      });
-      
-      if (cashierResponse.ok) {
-        console.log('Cashier webhook sent successfully');
-      } else {
-        console.error('Cashier webhook error:', await cashierResponse.text());
+      try {
+        const cashierResponse = await fetch(cashierWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cashierPayload)
+        });
+        
+        if (!cashierResponse.ok) {
+          const errorText = await cashierResponse.text();
+          console.error('Cashier webhook error:', errorText);
+          webhookErrors.push({ webhook: 'cashier', error: errorText });
+        } else {
+          console.log('Cashier webhook sent successfully');
+        }
+      } catch (error) {
+        console.error('Cashier webhook exception:', error);
+        webhookErrors.push({ webhook: 'cashier', error: error.message });
       }
     } catch (error) {
       console.error('Cashier PDF/webhook error:', error);
+      webhookErrors.push({ webhook: 'cashier_pdf', error: error.message });
     }
     
+    // Check if there were webhook errors
+    const hasWebhookErrors = webhookErrors.length > 0;
+    
     return new Response(JSON.stringify({ 
-      success: true, 
-      message: 'Order received successfully',
+      success: !hasWebhookErrors, 
+      message: hasWebhookErrors 
+        ? 'Order saved but notification failed. Please check n8n workflows.'
+        : 'Order received successfully',
       order: data,
-      pdfGenerated: true
+      pdfGenerated: true,
+      webhookErrors: hasWebhookErrors ? webhookErrors : undefined
     }), {
+      status: hasWebhookErrors ? 500 : 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
