@@ -164,6 +164,11 @@ const Index = () => {
           const deletedOrder = payload.old as Order;
           setPendingOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
           setCompletedOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
+          
+          // Print cancellation ticket
+          setTimeout(() => {
+            printCancelledOrder(deletedOrder);
+          }, 500);
         }
       )
       .subscribe();
@@ -310,85 +315,178 @@ const Index = () => {
   };
 
   const printOrderChanges = (order: Order, added: OrderItem[], removed: OrderItem[]) => {
+    const formatItem = (item: OrderItem) => {
+      let itemText = `${item.burger_type} ${item.patty_size}`;
+      if (item.combo) itemText += ' en Combo';
+      if (item.additions && item.additions.length > 0) {
+        itemText += ` (con ${item.additions.join(', ')})`;
+      }
+      if (item.removals && item.removals.length > 0) {
+        itemText += ` (sin ${item.removals.join(', ')})`;
+      }
+      return itemText;
+    };
+
     const printContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Cambios Pedido #${order.order_number} - Roses Burgers</title>
+          <title>Modificación Pedido #${order.order_number} - Roses Burgers</title>
           <style>
             body { 
               font-family: 'Courier New', monospace; 
               width: 80mm;
               margin: 0;
               padding: 10px;
-              font-size: 12px;
+              font-size: 13px;
             }
             .header {
               text-align: center;
-              margin-bottom: 10px;
+              margin-bottom: 15px;
               padding-bottom: 10px;
               border-bottom: 2px dashed #000;
             }
             .title {
-              font-size: 18px;
+              font-size: 20px;
               font-weight: bold;
               margin-bottom: 5px;
             }
+            .modification-badge {
+              font-size: 16px;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
             .order-info {
               margin-bottom: 15px;
-              padding-bottom: 10px;
-              border-bottom: 1px dashed #000;
+              font-size: 14px;
             }
-            .item {
-              margin-bottom: 8px;
-              padding: 5px 0;
-            }
-            .item-name {
-              font-weight: bold;
-              font-size: 13px;
-            }
-            .item-details {
-              font-size: 11px;
-              margin-left: 10px;
-              color: #333;
-            }
-            .added {
-              background-color: #d4edda;
-              padding: 5px;
-              margin: 5px 0;
-            }
-            .removed {
-              background-color: #f8d7da;
-              padding: 5px;
-              margin: 5px 0;
-              text-decoration: line-through;
+            .section {
+              margin: 15px 0;
             }
             .section-title {
               font-weight: bold;
-              font-size: 14px;
-              margin: 10px 0 5px 0;
-              text-transform: uppercase;
+              font-size: 15px;
+              margin-bottom: 8px;
+            }
+            .item {
+              margin: 5px 0 5px 15px;
+              font-size: 13px;
+              line-height: 1.4;
+            }
+            .added-item {
+              color: #000;
+            }
+            .removed-item {
+              color: #000;
             }
             .footer {
               text-align: center;
-              margin-top: 15px;
-              padding-top: 8px;
+              margin-top: 20px;
+              padding-top: 10px;
               border-top: 1px dashed #000;
-              font-size: 10px;
+              font-size: 11px;
             }
             @media print {
               body { 
                 margin: 0; 
                 width: 80mm;
-                font-size: 11px;
               }
-              .added {
-                background-color: transparent;
-                border: 2px solid #000;
-              }
-              .removed {
-                background-color: transparent;
-                border: 2px solid #000;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">🔄 MODIFICACIÓN</div>
+            <div class="modification-badge">PEDIDO #${order.order_number}</div>
+          </div>
+          
+          <div class="order-info">
+            <strong>Cliente:</strong> ${order.nombre}
+          </div>
+          
+          ${removed.length > 0 ? `
+            <div class="section">
+              <div class="section-title">❌ QUITAR:</div>
+              ${removed.map(item => `
+                <div class="item removed-item">- ${formatItem(item)}${item.quantity > 1 ? ` (x${item.quantity})` : ''}</div>
+              `).join('')}
+            </div>
+          ` : ''}
+          
+          ${added.length > 0 ? `
+            <div class="section">
+              <div class="section-title">✅ AGREGAR:</div>
+              ${added.map(item => `
+                <div class="item added-item">+ ${formatItem(item)}${item.quantity > 1 ? ` (x${item.quantity})` : ''}</div>
+              `).join('')}
+            </div>
+          ` : ''}
+          
+          <div class="footer">
+            ${new Date().toLocaleTimeString('es-AR')}<br>
+            COMANDA DE MODIFICACIÓN
+          </div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }
+  };
+
+  const printCancelledOrder = (order: Order) => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Pedido Cancelado #${order.order_number} - Roses Burgers</title>
+          <style>
+            body { 
+              font-family: 'Courier New', monospace; 
+              width: 80mm;
+              margin: 0;
+              padding: 10px;
+              font-size: 13px;
+              text-align: center;
+            }
+            .header {
+              margin-bottom: 20px;
+              padding-bottom: 15px;
+              border-bottom: 2px dashed #000;
+            }
+            .title {
+              font-size: 20px;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .cancelled-badge {
+              font-size: 24px;
+              font-weight: bold;
+              margin: 20px 0;
+              padding: 15px;
+              border: 3px solid #000;
+            }
+            .order-number {
+              font-size: 32px;
+              font-weight: bold;
+              margin: 15px 0;
+            }
+            .footer {
+              margin-top: 20px;
+              padding-top: 10px;
+              border-top: 1px dashed #000;
+              font-size: 11px;
+            }
+            @media print {
+              body { 
+                margin: 0; 
+                width: 80mm;
               }
             }
           </style>
@@ -396,46 +494,19 @@ const Index = () => {
         <body>
           <div class="header">
             <div class="title">ROSES BURGERS</div>
-            <div>CAMBIOS EN PEDIDO</div>
           </div>
           
-          <div class="order-info">
-            <div><strong>Pedido:</strong> #${order.order_number}</div>
-            <div><strong>Cliente:</strong> ${order.nombre}</div>
+          <div class="cancelled-badge">
+            ❌ CANCELADO ❌
           </div>
           
-          ${added.length > 0 ? `
-            <div class="section-title">✓ AGREGADOS</div>
-            ${added.map(item => `
-              <div class="item added">
-                <div class="item-name">${item.quantity}x ${item.burger_type}</div>
-                <div class="item-details">
-                  ${item.patty_size}
-                  ${item.combo ? ' + COMBO' : ''}
-                  ${item.additions && item.additions.length > 0 ? '<br>Agregar: ' + item.additions.join(', ') : ''}
-                  ${item.removals && item.removals.length > 0 ? '<br>Sin: ' + item.removals.join(', ') : ''}
-                </div>
-              </div>
-            `).join('')}
-          ` : ''}
-          
-          ${removed.length > 0 ? `
-            <div class="section-title">✗ ELIMINADOS</div>
-            ${removed.map(item => `
-              <div class="item removed">
-                <div class="item-name">${item.quantity}x ${item.burger_type}</div>
-                <div class="item-details">
-                  ${item.patty_size}
-                  ${item.combo ? ' + COMBO' : ''}
-                  ${item.additions && item.additions.length > 0 ? '<br>Agregar: ' + item.additions.join(', ') : ''}
-                  ${item.removals && item.removals.length > 0 ? '<br>Sin: ' + item.removals.join(', ') : ''}
-                </div>
-              </div>
-            `).join('')}
-          ` : ''}
+          <div class="order-number">
+            PEDIDO #${order.order_number}
+          </div>
           
           <div class="footer">
-            Impreso: ${new Date().toLocaleString('es-AR')}
+            ${new Date().toLocaleTimeString('es-AR')}<br>
+            PEDIDO CANCELADO
           </div>
         </body>
       </html>
