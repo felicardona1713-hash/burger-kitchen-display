@@ -97,13 +97,14 @@ const Index = () => {
           console.log('Order INSERT:', payload);
           const newOrder = payload.new as Order;
           if (newOrder.status === 'pending') {
-            setPendingOrders(prev => {
-              const updatedOrders = [newOrder, ...prev];
-              setTimeout(() => {
-                printSingleOrder(newOrder);
-              }, 500);
-              return updatedOrders;
-            });
+            setPendingOrders(prev => [newOrder, ...prev]);
+            
+            // Imprimir pedido nuevo
+            console.log('Imprimiendo nuevo pedido:', newOrder.order_number);
+            setTimeout(() => {
+              printSingleOrder(newOrder);
+            }, 500);
+            
             toast({
               title: "¡Nuevo Pedido!",
               description: `${newOrder.nombre} - $${newOrder.monto}`,
@@ -122,33 +123,40 @@ const Index = () => {
         (payload) => {
           console.log('Order UPDATE:', payload);
           const raw = payload.new as any;
+          const oldRaw = payload.old as any;
+          
           const updatedOrder: Order = {
             ...raw,
             items: Array.isArray(raw.items) ? (raw.items as OrderItem[]) : undefined,
             item_status: Array.isArray(raw.item_status) ? (raw.item_status as ItemStatus[]) : undefined,
           };
           
+          const oldOrder: Order = {
+            ...oldRaw,
+            items: Array.isArray(oldRaw.items) ? (oldRaw.items as OrderItem[]) : undefined,
+            item_status: Array.isArray(oldRaw.item_status) ? (oldRaw.item_status as ItemStatus[]) : undefined,
+          };
+          
           if (updatedOrder.status === 'completed') {
             setPendingOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
             setCompletedOrders(prev => [updatedOrder, ...prev]);
           } else if (updatedOrder.status === 'pending') {
-            setPendingOrders(prev => {
-              const oldOrder = prev.find(order => order.id === updatedOrder.id);
-              
-              // If order was edited, compare items and print differences
-              if (oldOrder && oldOrder.items && updatedOrder.items) {
-                const changes = compareItemsAndPrintChanges(oldOrder, updatedOrder);
-                if (changes.hasChanges) {
-                  setTimeout(() => {
-                    printOrderChanges(updatedOrder, changes.added, changes.removed);
-                  }, 500);
-                }
+            // Comparar items y imprimir cambios
+            if (oldOrder.items && updatedOrder.items) {
+              const changes = compareItemsAndPrintChanges(oldOrder, updatedOrder);
+              if (changes.hasChanges) {
+                console.log('Imprimiendo modificación pedido:', updatedOrder.order_number);
+                setTimeout(() => {
+                  printOrderChanges(updatedOrder, changes.added, changes.removed);
+                }, 500);
               }
-              
-              return prev.map(order => 
+            }
+            
+            setPendingOrders(prev => 
+              prev.map(order => 
                 order.id === updatedOrder.id ? updatedOrder : order
-              );
-            });
+              )
+            );
           }
         }
       )
@@ -162,13 +170,15 @@ const Index = () => {
         (payload) => {
           console.log('Order DELETE:', payload);
           const deletedOrder = payload.old as Order;
-          setPendingOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
-          setCompletedOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
           
-          // Print cancellation ticket
+          // Imprimir ticket de cancelación
+          console.log('Imprimiendo cancelación pedido:', deletedOrder.order_number);
           setTimeout(() => {
             printCancelledOrder(deletedOrder);
           }, 500);
+          
+          setPendingOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
+          setCompletedOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
         }
       )
       .subscribe();
