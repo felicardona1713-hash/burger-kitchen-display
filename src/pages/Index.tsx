@@ -127,13 +127,28 @@ const Index = () => {
             items: Array.isArray(raw.items) ? (raw.items as OrderItem[]) : undefined,
             item_status: Array.isArray(raw.item_status) ? (raw.item_status as ItemStatus[]) : undefined,
           };
+          
           if (updatedOrder.status === 'completed') {
             setPendingOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
             setCompletedOrders(prev => [updatedOrder, ...prev]);
           } else if (updatedOrder.status === 'pending') {
-            setPendingOrders(prev => prev.map(order => 
-              order.id === updatedOrder.id ? updatedOrder : order
-            ));
+            setPendingOrders(prev => {
+              const oldOrder = prev.find(order => order.id === updatedOrder.id);
+              
+              // If order was edited, compare items and print differences
+              if (oldOrder && oldOrder.items && updatedOrder.items) {
+                const changes = compareItemsAndPrintChanges(oldOrder, updatedOrder);
+                if (changes.hasChanges) {
+                  setTimeout(() => {
+                    printOrderChanges(updatedOrder, changes.added, changes.removed);
+                  }, 500);
+                }
+              }
+              
+              return prev.map(order => 
+                order.id === updatedOrder.id ? updatedOrder : order
+              );
+            });
           }
         }
       )
@@ -238,6 +253,202 @@ const Index = () => {
     if (diffInMinutes < 15) return { text: `${diffInMinutes} min`, urgent: false };
     if (diffInMinutes < 30) return { text: `${diffInMinutes} min`, urgent: true };
     return { text: `${diffInMinutes} min`, urgent: true };
+  };
+
+  const compareItemsAndPrintChanges = (oldOrder: Order, newOrder: Order) => {
+    const oldItems = oldOrder.items || [];
+    const newItems = newOrder.items || [];
+    
+    const added: OrderItem[] = [];
+    const removed: OrderItem[] = [];
+    
+    // Find added items
+    newItems.forEach(newItem => {
+      const matchingOld = oldItems.find(oldItem => 
+        oldItem.burger_type === newItem.burger_type && 
+        oldItem.patty_size === newItem.patty_size &&
+        oldItem.combo === newItem.combo &&
+        JSON.stringify(oldItem.additions) === JSON.stringify(newItem.additions) &&
+        JSON.stringify(oldItem.removals) === JSON.stringify(newItem.removals)
+      );
+      
+      if (!matchingOld) {
+        added.push(newItem);
+      } else if (matchingOld.quantity < newItem.quantity) {
+        added.push({
+          ...newItem,
+          quantity: newItem.quantity - matchingOld.quantity
+        });
+      }
+    });
+    
+    // Find removed items
+    oldItems.forEach(oldItem => {
+      const matchingNew = newItems.find(newItem => 
+        newItem.burger_type === oldItem.burger_type && 
+        newItem.patty_size === oldItem.patty_size &&
+        newItem.combo === oldItem.combo &&
+        JSON.stringify(newItem.additions) === JSON.stringify(oldItem.additions) &&
+        JSON.stringify(newItem.removals) === JSON.stringify(oldItem.removals)
+      );
+      
+      if (!matchingNew) {
+        removed.push(oldItem);
+      } else if (matchingNew.quantity < oldItem.quantity) {
+        removed.push({
+          ...oldItem,
+          quantity: oldItem.quantity - matchingNew.quantity
+        });
+      }
+    });
+    
+    return {
+      hasChanges: added.length > 0 || removed.length > 0,
+      added,
+      removed
+    };
+  };
+
+  const printOrderChanges = (order: Order, added: OrderItem[], removed: OrderItem[]) => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Cambios Pedido #${order.order_number} - Roses Burgers</title>
+          <style>
+            body { 
+              font-family: 'Courier New', monospace; 
+              width: 80mm;
+              margin: 0;
+              padding: 10px;
+              font-size: 12px;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 10px;
+              padding-bottom: 10px;
+              border-bottom: 2px dashed #000;
+            }
+            .title {
+              font-size: 18px;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .order-info {
+              margin-bottom: 15px;
+              padding-bottom: 10px;
+              border-bottom: 1px dashed #000;
+            }
+            .item {
+              margin-bottom: 8px;
+              padding: 5px 0;
+            }
+            .item-name {
+              font-weight: bold;
+              font-size: 13px;
+            }
+            .item-details {
+              font-size: 11px;
+              margin-left: 10px;
+              color: #333;
+            }
+            .added {
+              background-color: #d4edda;
+              padding: 5px;
+              margin: 5px 0;
+            }
+            .removed {
+              background-color: #f8d7da;
+              padding: 5px;
+              margin: 5px 0;
+              text-decoration: line-through;
+            }
+            .section-title {
+              font-weight: bold;
+              font-size: 14px;
+              margin: 10px 0 5px 0;
+              text-transform: uppercase;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 15px;
+              padding-top: 8px;
+              border-top: 1px dashed #000;
+              font-size: 10px;
+            }
+            @media print {
+              body { 
+                margin: 0; 
+                width: 80mm;
+                font-size: 11px;
+              }
+              .added {
+                background-color: transparent;
+                border: 2px solid #000;
+              }
+              .removed {
+                background-color: transparent;
+                border: 2px solid #000;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">ROSES BURGERS</div>
+            <div>CAMBIOS EN PEDIDO</div>
+          </div>
+          
+          <div class="order-info">
+            <div><strong>Pedido:</strong> #${order.order_number}</div>
+            <div><strong>Cliente:</strong> ${order.nombre}</div>
+          </div>
+          
+          ${added.length > 0 ? `
+            <div class="section-title">✓ AGREGADOS</div>
+            ${added.map(item => `
+              <div class="item added">
+                <div class="item-name">${item.quantity}x ${item.burger_type}</div>
+                <div class="item-details">
+                  ${item.patty_size}
+                  ${item.combo ? ' + COMBO' : ''}
+                  ${item.additions && item.additions.length > 0 ? '<br>Agregar: ' + item.additions.join(', ') : ''}
+                  ${item.removals && item.removals.length > 0 ? '<br>Sin: ' + item.removals.join(', ') : ''}
+                </div>
+              </div>
+            `).join('')}
+          ` : ''}
+          
+          ${removed.length > 0 ? `
+            <div class="section-title">✗ ELIMINADOS</div>
+            ${removed.map(item => `
+              <div class="item removed">
+                <div class="item-name">${item.quantity}x ${item.burger_type}</div>
+                <div class="item-details">
+                  ${item.patty_size}
+                  ${item.combo ? ' + COMBO' : ''}
+                  ${item.additions && item.additions.length > 0 ? '<br>Agregar: ' + item.additions.join(', ') : ''}
+                  ${item.removals && item.removals.length > 0 ? '<br>Sin: ' + item.removals.join(', ') : ''}
+                </div>
+              </div>
+            `).join('')}
+          ` : ''}
+          
+          <div class="footer">
+            Impreso: ${new Date().toLocaleString('es-AR')}
+          </div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }
   };
 
   const printSingleOrder = (order: Order) => {
