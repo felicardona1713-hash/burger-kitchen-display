@@ -89,35 +89,61 @@ const Index = () => {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'orders'
         },
         (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newOrder = payload.new as Order;
-            if (newOrder.status === 'pending') {
-              setPendingOrders(prev => {
-                const updatedOrders = [newOrder, ...prev];
-                // Imprimir automáticamente el nuevo pedido
-                setTimeout(() => {
-                  printSingleOrder(newOrder);
-                }, 500); // Pequeño delay para asegurar que el estado se actualice
-                return updatedOrders;
-              });
-              toast({
-                title: "¡Nuevo Pedido!",
-                description: `${newOrder.nombre} - $${newOrder.monto}`,
-                duration: 5000,
-              });
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedOrder = payload.new as Order;
-            if (updatedOrder.status === 'completed') {
-              setPendingOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
-              setCompletedOrders(prev => [updatedOrder, ...prev]);
-            }
+          console.log('Order INSERT:', payload);
+          const newOrder = payload.new as Order;
+          if (newOrder.status === 'pending') {
+            setPendingOrders(prev => {
+              const updatedOrders = [newOrder, ...prev];
+              setTimeout(() => {
+                printSingleOrder(newOrder);
+              }, 500);
+              return updatedOrders;
+            });
+            toast({
+              title: "¡Nuevo Pedido!",
+              description: `${newOrder.nombre} - $${newOrder.monto}`,
+              duration: 5000,
+            });
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          console.log('Order UPDATE:', payload);
+          const updatedOrder = payload.new as Order;
+          if (updatedOrder.status === 'completed') {
+            setPendingOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
+            setCompletedOrders(prev => [updatedOrder, ...prev]);
+          } else if (updatedOrder.status === 'pending') {
+            setPendingOrders(prev => prev.map(order => 
+              order.id === updatedOrder.id ? updatedOrder : order
+            ));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          console.log('Order DELETE:', payload);
+          const deletedOrder = payload.old as Order;
+          setPendingOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
+          setCompletedOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
         }
       )
       .subscribe();

@@ -72,28 +72,54 @@ const Kitchen = () => {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'orders'
         },
         (payload) => {
-          console.log('Order update:', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            const newOrder = payload.new as Order;
-              if (newOrder.status === 'pending') {
-                setOrders(prev => [...prev, newOrder]);
-                const itemsDesc = newOrder.items?.map(i => `${i.quantity}x ${i.burger_type}`).join(', ') || '';
-                toast({
-                  title: "¡Nuevo Pedido!",
-                  description: `${newOrder.nombre} - ${itemsDesc}`,
-                  duration: 5000,
-                });
-              }
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedOrder = payload.new as Order;
-            setOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
+          console.log('Order INSERT:', payload);
+          const newOrder = payload.new as Order;
+          if (newOrder.status === 'pending') {
+            setOrders(prev => [...prev, newOrder]);
+            const itemsDesc = newOrder.items?.map(i => `${i.quantity}x ${i.burger_type}`).join(', ') || '';
+            toast({
+              title: "¡Nuevo Pedido!",
+              description: `${newOrder.nombre} - ${itemsDesc}`,
+              duration: 5000,
+            });
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          console.log('Order UPDATE:', payload);
+          const updatedOrder = payload.new as Order;
+          if (updatedOrder.status === 'completed') {
+            setOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
+          } else if (updatedOrder.status === 'pending') {
+            setOrders(prev => prev.map(order => 
+              order.id === updatedOrder.id ? updatedOrder : order
+            ));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          console.log('Order DELETE:', payload);
+          const deletedOrder = payload.old as Order;
+          setOrders(prev => prev.filter(order => order.id !== deletedOrder.id));
         }
       )
       .subscribe();
