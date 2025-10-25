@@ -64,7 +64,6 @@ export type Database = {
           order_number: number
           status: string
           telefono: string | null
-          total: number | null
         }
         Insert: {
           created_at?: string
@@ -79,7 +78,6 @@ export type Database = {
           order_number?: number
           status?: string
           telefono?: string | null
-          total?: number | null
         }
         Update: {
           created_at?: string
@@ -94,7 +92,6 @@ export type Database = {
           order_number?: number
           status?: string
           telefono?: string | null
-          total?: number | null
         }
         Relationships: []
       }
@@ -103,10 +100,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_daily_order_number: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      get_daily_order_number: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never

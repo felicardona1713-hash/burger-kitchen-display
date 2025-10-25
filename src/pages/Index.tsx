@@ -29,7 +29,7 @@ interface ItemStatus {
 interface Order {
   id: string;
   nombre: string;
-  total: number;
+  monto: number;
   fecha: string;
   status: string;
   created_at: string;
@@ -107,7 +107,7 @@ const Index = () => {
               });
               toast({
                 title: "¡Nuevo Pedido!",
-                description: `${newOrder.nombre} - $${newOrder.total}`,
+                description: `${newOrder.nombre} - $${newOrder.monto}`,
                 duration: 5000,
               });
             }
@@ -356,7 +356,7 @@ const Index = () => {
             </div>
             
             <div class="total">
-              TOTAL: $${order.total}
+              TOTAL: $${order.monto}
             </div>
           </div>
           
@@ -538,7 +538,7 @@ const Index = () => {
                 </div>
                 
                 <div class="total">
-                  TOTAL: $${order.total}
+                  TOTAL: $${order.monto}
                 </div>
               </div>
             `;
@@ -597,7 +597,7 @@ const Index = () => {
               )}
               <Badge variant="outline" className="text-xs">
                 <DollarSign className="w-3 h-3 mr-1" />
-                ${order.total}
+                ${order.monto}
               </Badge>
               <Badge 
                 variant={order.metodo_pago === 'transferencia' ? 'default' : 'secondary'}

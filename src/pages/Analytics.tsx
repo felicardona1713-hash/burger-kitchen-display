@@ -21,7 +21,7 @@ interface Order {
   nombre: string;
   telefono?: string | null;
   items?: OrderItem[];
-  total: number;
+  monto: number;
   fecha: string;
   status: string;
   created_at: string;
@@ -67,7 +67,7 @@ const Analytics = () => {
       }));
       setOrders(allOrders);
       setTotalOrders(allOrders.length);
-      setTotalRevenue(allOrders.reduce((sum, order) => sum + Number(order.total), 0));
+      setTotalRevenue(allOrders.reduce((sum, order) => sum + Number(order.monto), 0));
 
       // Analyze products from items array - group by burger_type + patty_size + combo
       const productMap = new Map<string, { cantidad: number; ingresos: number; producto: string; pattySize: string; combo: boolean }>();
@@ -93,7 +93,7 @@ const Analytics = () => {
               combo: isCombo
             };
             
-            const itemRevenue = Number(order.total) / order.items.length;
+            const itemRevenue = Number(order.monto) / order.items.length;
             
             productMap.set(key, {
               ...current,
@@ -119,7 +119,7 @@ const Analytics = () => {
         const current = customerMap.get(clienteKey) || { totalPedidos: 0, totalGastado: 0 };
         customerMap.set(clienteKey, {
           totalPedidos: current.totalPedidos + 1,
-          totalGastado: current.totalGastado + Number(order.total)
+          totalGastado: current.totalGastado + Number(order.monto)
         });
       });
 
@@ -281,7 +281,7 @@ const Analytics = () => {
                         </div>
                       ))}
                     </TableCell>
-                    <TableCell>${order.total}</TableCell>
+                    <TableCell>${order.monto}</TableCell>
                     <TableCell>
                       <Badge 
                         variant={order.status === 'completed' ? 'default' : 'secondary'}

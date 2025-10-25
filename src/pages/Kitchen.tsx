@@ -29,7 +29,7 @@ interface Order {
   id: string;
   order_number: number;
   nombre: string;
-  total: number;
+  monto: number;
   fecha: string;
   status: string;
   created_at: string;
@@ -234,7 +234,7 @@ const Kitchen = () => {
                         </Badge>
                         <Badge variant="outline" className="text-xs">
                           <DollarSign className="w-3 h-3 mr-1" />
-                          ${order.total}
+                          ${order.monto}
                         </Badge>
                         <Badge 
                           variant={order.metodo_pago === 'transferencia' ? 'default' : 'secondary'}
