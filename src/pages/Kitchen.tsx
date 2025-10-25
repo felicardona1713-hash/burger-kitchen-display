@@ -99,7 +99,12 @@ const Kitchen = () => {
         },
         (payload) => {
           console.log('Order UPDATE:', payload);
-          const updatedOrder = payload.new as Order;
+          const raw = payload.new as any;
+          const updatedOrder: Order = {
+            ...raw,
+            items: Array.isArray(raw.items) ? (raw.items as OrderItem[]) : undefined,
+            item_status: Array.isArray(raw.item_status) ? (raw.item_status as ItemStatus[]) : undefined,
+          };
           if (updatedOrder.status === 'completed') {
             setOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
           } else if (updatedOrder.status === 'pending') {
@@ -183,6 +188,8 @@ const Kitchen = () => {
         variant: "destructive"
       });
     } else {
+      // Optimistic local update while waiting for realtime
+      setOrders(prev => prev.filter(o => o.id !== orderId));
       toast({
         title: "Pedido Completado",
         description: "El pedido ha sido marcado como listo",
