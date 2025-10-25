@@ -121,11 +121,7 @@ const Index = () => {
         },
         (payload) => {
           console.log('Order UPDATE:', payload);
-          const updatedOrder = {
-            ...payload.new as Order,
-            items: Array.isArray((payload.new as any).items) ? (payload.new as any).items as unknown as OrderItem[] : undefined,
-            item_status: Array.isArray((payload.new as any).item_status) ? (payload.new as any).item_status as unknown as ItemStatus[] : undefined
-          };
+          const updatedOrder = payload.new as Order;
           if (updatedOrder.status === 'completed') {
             setPendingOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
             setCompletedOrders(prev => [updatedOrder, ...prev]);
