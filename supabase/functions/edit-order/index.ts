@@ -112,49 +112,75 @@ Deno.serve(async (req) => {
         const oldItems = Array.isArray(existingOrder.items) ? existingOrder.items as any[] : [];
         const newItems = items as any[];
 
-        const jsonEq = (a: any, b: any) => JSON.stringify(a || null) === JSON.stringify(b || null);
+        const normalize = (it: any) => ({
+          burger_type: (it?.burger_type || '').toString().trim().toLowerCase(),
+          patty_size: (it?.patty_size || '').toString().trim().toLowerCase(),
+          combo: Boolean(it?.combo),
+          additions: Array.isArray(it?.additions)
+            ? [...it.additions].map((s: any) => (s ?? '').toString().trim().toLowerCase()).sort()
+            : [],
+          removals: Array.isArray(it?.removals)
+            ? [...it.removals].map((s: any) => (s ?? '').toString().trim().toLowerCase()).sort()
+            : [],
+        });
+
+        const isSameItem = (a: any, b: any) => {
+          const na = normalize(a);
+          const nb = normalize(b);
+          return (
+            na.burger_type === nb.burger_type &&
+            na.patty_size === nb.patty_size &&
+            na.combo === nb.combo &&
+            JSON.stringify(na.additions) === JSON.stringify(nb.additions) &&
+            JSON.stringify(na.removals) === JSON.stringify(nb.removals)
+          );
+        };
 
         const added: any[] = [];
         const removed: any[] = [];
 
         // Find added items or increased quantities
         newItems.forEach((ni) => {
-          const match = oldItems.find((oi) =>
-            oi.burger_type === ni.burger_type &&
-            oi.patty_size === ni.patty_size &&
-            oi.combo === ni.combo &&
-            jsonEq(oi.additions, ni.additions) &&
-            jsonEq(oi.removals, ni.removals)
-          );
+          const match = oldItems.find((oi) => isSameItem(oi, ni));
           if (!match) {
             added.push(ni);
-          } else if ((match.quantity || 0) < (ni.quantity || 0)) {
-            added.push({ ...ni, quantity: (ni.quantity || 0) - (match.quantity || 0) });
+          } else {
+            const oldQ = Number(match.quantity ?? 1);
+            const newQ = Number(ni.quantity ?? 1);
+            if (newQ > oldQ) {
+              added.push({ ...ni, quantity: newQ - oldQ });
+            }
           }
         });
 
         // Find removed items or decreased quantities
         oldItems.forEach((oi) => {
-          const match = newItems.find((ni) =>
-            ni.burger_type === oi.burger_type &&
-            ni.patty_size === oi.patty_size &&
-            ni.combo === oi.combo &&
-            jsonEq(ni.additions, oi.additions) &&
-            jsonEq(ni.removals, oi.removals)
-          );
+          const match = newItems.find((ni) => isSameItem(ni, oi));
           if (!match) {
             removed.push(oi);
-          } else if ((match.quantity || 0) < (oi.quantity || 0)) {
-            removed.push({ ...oi, quantity: (oi.quantity || 0) - (match.quantity || 0) });
+          } else {
+            const oldQ = Number(oi.quantity ?? 1);
+            const newQ = Number(match.quantity ?? 1);
+            if (newQ < oldQ) {
+              removed.push({ ...oi, quantity: oldQ - newQ });
+            }
           }
         });
 
         const hasChanges = added.length > 0 || removed.length > 0;
 
         // Detect simple swap (one removed and one added with same qty)
-        const isSwap = added.length === 1 && removed.length === 1 &&
-          (added[0].quantity || 0) === (removed[0].quantity || 0);
+        const isSwap =
+          added.length === 1 &&
+          removed.length === 1 &&
+          Number(added[0].quantity ?? 1) === Number(removed[0].quantity ?? 1);
 
+        console.log('edit-order change detection:', {
+          order_number: existingOrder.order_number,
+          added,
+          removed,
+          isSwap,
+        });
         if (hasChanges) {
           const kitchenWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCocina';
           const cashierWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCaja';
@@ -214,20 +240,34 @@ Deno.serve(async (req) => {
 
             // Send webhooks
             try {
-              const r = await fetch(kitchenWebhookUrl, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ order_number: existingOrder.order_number, pdf: kitchenB64, nombre: updatedOrder?.nombre || existingOrder.nombre })
+              const payloadKitchen = { order_number: existingOrder.order_number, pdf: kitchenB64, nombre: updatedOrder?.nombre || existingOrder.nombre };
+              const rk = await fetch(kitchenWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadKitchen)
               });
-              if (!r.ok) throw new Error(`Kitchen webhook ${r.status}`);
-            } catch (e) { webhookErrors.push({ type: 'kitchen', error: (e as Error).message }); }
+              if (!rk.ok) throw new Error(`Kitchen webhook ${rk.status}`);
+              console.log('edit-order kitchen webhook sent', { order_number: existingOrder.order_number });
+            } catch (e) {
+              const msg = (e as Error).message;
+              console.error('edit-order kitchen webhook error', msg);
+              webhookErrors.push({ type: 'kitchen', error: msg });
+            }
 
             try {
-              const r = await fetch(cashierWebhookUrl, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ order_number: existingOrder.order_number, pdf: cashierB64, nombre: updatedOrder?.nombre || existingOrder.nombre })
+              const payloadCashier = { order_number: existingOrder.order_number, pdf: cashierB64, nombre: updatedOrder?.nombre || existingOrder.nombre };
+              const rc = await fetch(cashierWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadCashier)
               });
-              if (!r.ok) throw new Error(`Cashier webhook ${r.status}`);
-            } catch (e) { webhookErrors.push({ type: 'cashier', error: (e as Error).message }); }
+              if (!rc.ok) throw new Error(`Cashier webhook ${rc.status}`);
+              console.log('edit-order cashier webhook sent', { order_number: existingOrder.order_number });
+            } catch (e) {
+              const msg = (e as Error).message;
+              console.error('edit-order cashier webhook error', msg);
+              webhookErrors.push({ type: 'cashier', error: msg });
+            }
           } catch (e) {
             webhookErrors.push({ type: 'pdf', error: (e as Error).message });
           }
