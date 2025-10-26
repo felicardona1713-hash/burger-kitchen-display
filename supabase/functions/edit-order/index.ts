@@ -240,7 +240,21 @@ Deno.serve(async (req) => {
 
             // Send webhooks
             try {
-              const payloadKitchen = { order_number: existingOrder.order_number, pdf: kitchenB64, nombre: updatedOrder?.nombre || existingOrder.nombre };
+              const payloadKitchen = {
+                order_number: existingOrder.order_number,
+                pdf: kitchenB64,
+                nombre: updatedOrder?.nombre || existingOrder.nombre,
+                items: (updatedOrder?.items || existingOrder.items || []),
+                items_added: added,
+                items_removed: removed,
+                is_swap: isSwap,
+                tipo: 'modificacion',
+                telefono: updatedOrder?.telefono || existingOrder.telefono || null,
+                direccion_envio: updatedOrder?.direccion_envio || existingOrder.direccion_envio || null,
+                monto: (updatedOrder?.monto ?? existingOrder.monto),
+                metodo_pago: updatedOrder?.metodo_pago || existingOrder.metodo_pago || null,
+              };
+              console.log('edit-order sending kitchen webhook', { order_number: existingOrder.order_number, added_count: added.length, removed_count: removed.length, isSwap });
               const rk = await fetch(kitchenWebhookUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -255,7 +269,21 @@ Deno.serve(async (req) => {
             }
 
             try {
-              const payloadCashier = { order_number: existingOrder.order_number, pdf: cashierB64, nombre: updatedOrder?.nombre || existingOrder.nombre };
+              const payloadCashier = {
+                order_number: existingOrder.order_number,
+                pdf: cashierB64,
+                nombre: updatedOrder?.nombre || existingOrder.nombre,
+                items: (updatedOrder?.items || existingOrder.items || []),
+                items_added: added,
+                items_removed: removed,
+                is_swap: isSwap,
+                tipo: 'modificacion',
+                telefono: updatedOrder?.telefono || existingOrder.telefono || null,
+                direccion_envio: updatedOrder?.direccion_envio || existingOrder.direccion_envio || null,
+                monto: (updatedOrder?.monto ?? existingOrder.monto),
+                metodo_pago: updatedOrder?.metodo_pago || existingOrder.metodo_pago || null,
+              };
+              console.log('edit-order sending cashier webhook', { order_number: existingOrder.order_number, added_count: added.length, removed_count: removed.length, isSwap });
               const rc = await fetch(cashierWebhookUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
