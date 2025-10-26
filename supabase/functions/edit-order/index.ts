@@ -44,11 +44,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Find the order by order_number
+    // Find the order by order_number from today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayISO = today.toISOString();
+    
     const { data: existingOrder, error: findError } = await supabase
       .from('orders')
       .select('*')
       .eq('order_number', order_number)
+      .gte('created_at', todayISO)
       .single();
 
     if (findError || !existingOrder) {
