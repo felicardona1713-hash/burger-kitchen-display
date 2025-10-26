@@ -44,25 +44,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Find the order by order_number from today
+    // Find the order by order_number from today (get the most recent one)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayISO = today.toISOString();
     
-    const { data: existingOrder, error: findError } = await supabase
+    const { data: orders, error: findError } = await supabase
       .from('orders')
       .select('*')
       .eq('order_number', order_number)
       .gte('created_at', todayISO)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    if (findError || !existingOrder) {
+    if (findError || !orders || orders.length === 0) {
       console.error('Order not found:', findError);
       return new Response(
         JSON.stringify({ error: 'Order not found', details: findError?.message }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const existingOrder = orders[0];
+
 
     // Prepare update data
     const updateData: any = {};
@@ -80,11 +84,11 @@ Deno.serve(async (req) => {
     if (direccion_envio !== undefined) updateData.direccion_envio = direccion_envio;
     if (metodo_pago !== undefined) updateData.metodo_pago = metodo_pago;
 
-    // Update the order
+    // Update the order using the specific ID
     const { data: updatedOrder, error: updateError } = await supabase
       .from('orders')
       .update(updateData)
-      .eq('order_number', order_number)
+      .eq('id', existingOrder.id)
       .select()
       .single();
 
