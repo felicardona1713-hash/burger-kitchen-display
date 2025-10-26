@@ -195,35 +195,64 @@ Deno.serve(async (req) => {
 
           const generatePDF = async (type: 'kitchen' | 'cashier') => {
             const pdfDoc = await PDFDocument.create();
-            const page = pdfDoc.addPage([226, 300]);
+            const page = pdfDoc.addPage([226, 400]);
             const font = await pdfDoc.embedFont(StandardFonts.Courier);
             const lineHeight = 12;
-            let y = 280;
+            let y = 380;
             const add = (text: string, size = 10, extra = 0) => {
               page.drawText(text, { x: 10, y, size, font, color: rgb(0,0,0) });
               y -= lineHeight + extra;
             };
 
-            if (isSwap) {
-              add(type === 'kitchen' ? 'COCINA' : 'CAJA', 12, 2);
-              add(`CAMBIO PEDIDO #${existingOrder.order_number}`, 11, 2);
-              add(`${formatItem(removed[0]).replace(/^\d+x\s/, '')} -> ${formatItem(added[0]).replace(/^\d+x\s/, '')}`, 10, 2);
+            if (type === 'kitchen') {
+              // COCINA: Solo mostrar cambios (como antes)
+              if (isSwap) {
+                add('COCINA', 12, 2);
+                add(`CAMBIO PEDIDO #${existingOrder.order_number}`, 11, 2);
+                add(`${formatItem(removed[0]).replace(/^\d+x\s/, '')} -> ${formatItem(added[0]).replace(/^\d+x\s/, '')}`, 10, 2);
+              } else {
+                add('COCINA', 12, 2);
+                add(`MODIFICACION PEDIDO #${existingOrder.order_number}`, 11, 2);
+                if (removed.length) {
+                  add('QUITAR:', 10, 0);
+                  removed.forEach((it: any) => add(`- ${formatItem(it)}`, 10));
+                  y -= 4;
+                }
+                if (added.length) {
+                  add('AGREGAR:', 10, 0);
+                  added.forEach((it: any) => add(`+ ${formatItem(it)}`, 10));
+                }
+              }
             } else {
-              add(type === 'kitchen' ? 'COCINA' : 'CAJA', 12, 2);
+              // CAJA: Mostrar pedido completo con marcas
+              add('CAJA', 12, 2);
               add(`MODIFICACION PEDIDO #${existingOrder.order_number}`, 11, 2);
-              if (removed.length) {
-                add('QUITAR:', 10, 0);
-                removed.forEach((it: any) => add(`- ${formatItem(it)}`, 10));
-                y -= 4;
-              }
-              if (added.length) {
-                add('AGREGAR:', 10, 0);
-                added.forEach((it: any) => add(`+ ${formatItem(it)}`, 10));
-              }
-            }
-
-            if (type === 'cashier') {
-              y -= 6; add(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`, 9);
+              add(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`, 9, 2);
+              
+              y -= 4;
+              add('PEDIDO COMPLETO:', 10, 0);
+              
+              const finalItems = updatedOrder?.items || existingOrder.items || [];
+              finalItems.forEach((item: any) => {
+                const isAdded = added.some((a: any) => isSameItem(a, item));
+                const isRemoved = removed.some((r: any) => isSameItem(r, item));
+                
+                let itemText = formatItem(item);
+                if (isAdded) itemText += ' (AGREGADA)';
+                if (isRemoved) itemText += ' (CANCELADA)';
+                
+                add(itemText, 9);
+              });
+              
+              y -= 4;
+              const tel = updatedOrder?.telefono || existingOrder.telefono;
+              const dir = updatedOrder?.direccion_envio || existingOrder.direccion_envio;
+              const pago = updatedOrder?.metodo_pago || existingOrder.metodo_pago;
+              
+              if (tel) add(`Tel: ${tel}`, 9);
+              if (dir) add(`Domicilio: ${dir}`, 9);
+              if (pago) add(`Pago: ${pago}`, 9);
+              add(`Monto: $${updatedOrder?.monto ?? existingOrder.monto}`, 10);
             }
 
             return await pdfDoc.save();
