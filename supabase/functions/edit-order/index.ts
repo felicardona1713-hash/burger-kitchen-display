@@ -108,6 +108,12 @@ Deno.serve(async (req) => {
     const webhookErrors: Array<{ type: string; error: string }> = [];
 
     try {
+      // Check if non-item fields changed (direccion_envio, telefono, metodo_pago)
+      const addressChanged = direccion_envio !== undefined && direccion_envio !== existingOrder.direccion_envio;
+      const phoneChanged = telefono !== undefined && telefono !== existingOrder.telefono;
+      const paymentChanged = metodo_pago !== undefined && metodo_pago !== existingOrder.metodo_pago;
+      const nonItemFieldsChanged = addressChanged || phoneChanged || paymentChanged;
+
       if (Array.isArray(items)) {
         const oldItems = Array.isArray(existingOrder.items) ? existingOrder.items as any[] : [];
         const newItems = items as any[];
@@ -167,7 +173,8 @@ Deno.serve(async (req) => {
           }
         });
 
-        const hasChanges = added.length > 0 || removed.length > 0;
+        const hasItemChanges = added.length > 0 || removed.length > 0;
+        const hasChanges = hasItemChanges || nonItemFieldsChanged;
 
         // Detect simple swap (one removed and one added with same qty)
         const isSwap =
@@ -180,12 +187,15 @@ Deno.serve(async (req) => {
           added,
           removed,
           isSwap,
+          addressChanged,
+          phoneChanged,
+          paymentChanged,
         });
         if (hasChanges) {
           const kitchenWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCocina';
           const cashierWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCaja';
 
-          const formatItem = (item: any) => {
+            const formatItem = (item: any) => {
             let t = `${item.quantity || 1}x ${item.burger_type} ${item.patty_size}`;
             if (item.combo) t += ' (combo)';
             if (item.additions && item.additions.length) t += ` + ${item.additions.join(', ')}`;
@@ -205,23 +215,28 @@ Deno.serve(async (req) => {
             };
 
             if (type === 'kitchen') {
-              // COCINA: Solo mostrar cambios (como antes)
-              if (isSwap) {
-                add('COCINA', 12, 2);
-                add(`CAMBIO PEDIDO #${existingOrder.order_number}`, 11, 2);
-                add(`${formatItem(removed[0]).replace(/^\d+x\s/, '')} -> ${formatItem(added[0]).replace(/^\d+x\s/, '')}`, 10, 2);
+              // COCINA: Solo mostrar cambios de items
+              if (hasItemChanges) {
+                if (isSwap) {
+                  add('COCINA', 12, 2);
+                  add(`CAMBIO PEDIDO #${existingOrder.order_number}`, 11, 2);
+                  add(`${formatItem(removed[0]).replace(/^\d+x\s/, '')} -> ${formatItem(added[0]).replace(/^\d+x\s/, '')}`, 10, 2);
+                } else {
+                  add('COCINA', 12, 2);
+                  add(`MODIFICACION PEDIDO #${existingOrder.order_number}`, 11, 2);
+                  if (removed.length) {
+                    add('QUITAR:', 10, 0);
+                    removed.forEach((it: any) => add(`- ${formatItem(it)}`, 10));
+                    y -= 4;
+                  }
+                  if (added.length) {
+                    add('AGREGAR:', 10, 0);
+                    added.forEach((it: any) => add(`+ ${formatItem(it)}`, 10));
+                  }
+                }
               } else {
-                add('COCINA', 12, 2);
-                add(`MODIFICACION PEDIDO #${existingOrder.order_number}`, 11, 2);
-                if (removed.length) {
-                  add('QUITAR:', 10, 0);
-                  removed.forEach((it: any) => add(`- ${formatItem(it)}`, 10));
-                  y -= 4;
-                }
-                if (added.length) {
-                  add('AGREGAR:', 10, 0);
-                  added.forEach((it: any) => add(`+ ${formatItem(it)}`, 10));
-                }
+                // Si solo cambió dirección/teléfono/pago, no enviar a cocina
+                return null;
               }
             } else {
               // CAJA: Mostrar pedido completo con marcas
@@ -250,8 +265,10 @@ Deno.serve(async (req) => {
               const pago = updatedOrder?.metodo_pago || existingOrder.metodo_pago;
               
               if (tel) add(`Tel: ${tel}`, 9);
-              if (dir) add(`Domicilio: ${dir}`, 9);
-              if (pago) add(`Pago: ${pago}`, 9);
+              if (dir) {
+                add(`Domicilio: ${dir}${addressChanged ? ' (NUEVO)' : ''}`, 9);
+              }
+              if (pago) add(`Pago: ${pago}${paymentChanged ? ' (NUEVO)' : ''}`, 9);
               add(`Monto: $${updatedOrder?.monto ?? existingOrder.monto}`, 10);
             }
 
@@ -260,42 +277,48 @@ Deno.serve(async (req) => {
 
           // Generate PDFs
           try {
-            const kitchenPdf = await generatePDF('kitchen');
+            const kitchenPdfResult = await generatePDF('kitchen');
             const cashierPdf = await generatePDF('cashier');
 
             const toB64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
-            const kitchenB64 = toB64(kitchenPdf);
-            const cashierB64 = toB64(cashierPdf);
 
-            // Send webhooks
-            try {
-              const payloadKitchen = {
-                order_number: existingOrder.order_number,
-                pdf: kitchenB64,
-                nombre: updatedOrder?.nombre || existingOrder.nombre,
-                items: (updatedOrder?.items || existingOrder.items || []),
-                items_added: added,
-                items_removed: removed,
-                is_swap: isSwap,
-                tipo: 'modificacion',
-                telefono: updatedOrder?.telefono || existingOrder.telefono || null,
-                direccion_envio: updatedOrder?.direccion_envio || existingOrder.direccion_envio || null,
-                monto: (updatedOrder?.monto ?? existingOrder.monto),
-                metodo_pago: updatedOrder?.metodo_pago || existingOrder.metodo_pago || null,
-              };
-              console.log('edit-order sending kitchen webhook', { order_number: existingOrder.order_number, added_count: added.length, removed_count: removed.length, isSwap });
-              const rk = await fetch(kitchenWebhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payloadKitchen)
-              });
-              if (!rk.ok) throw new Error(`Kitchen webhook ${rk.status}`);
-              console.log('edit-order kitchen webhook sent', { order_number: existingOrder.order_number });
-            } catch (e) {
-              const msg = (e as Error).message;
-              console.error('edit-order kitchen webhook error', msg);
-              webhookErrors.push({ type: 'kitchen', error: msg });
+            // Send kitchen webhook only if there are item changes
+            if (kitchenPdfResult !== null) {
+              const kitchenB64 = toB64(kitchenPdfResult);
+              try {
+                const payloadKitchen = {
+                  order_number: existingOrder.order_number,
+                  pdf: kitchenB64,
+                  nombre: updatedOrder?.nombre || existingOrder.nombre,
+                  items: (updatedOrder?.items || existingOrder.items || []),
+                  items_added: added,
+                  items_removed: removed,
+                  is_swap: isSwap,
+                  tipo: 'modificacion',
+                  telefono: updatedOrder?.telefono || existingOrder.telefono || null,
+                  direccion_envio: updatedOrder?.direccion_envio || existingOrder.direccion_envio || null,
+                  monto: (updatedOrder?.monto ?? existingOrder.monto),
+                  metodo_pago: updatedOrder?.metodo_pago || existingOrder.metodo_pago || null,
+                };
+                console.log('edit-order sending kitchen webhook', { order_number: existingOrder.order_number, added_count: added.length, removed_count: removed.length, isSwap });
+                const rk = await fetch(kitchenWebhookUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payloadKitchen)
+                });
+                if (!rk.ok) throw new Error(`Kitchen webhook ${rk.status}`);
+                console.log('edit-order kitchen webhook sent', { order_number: existingOrder.order_number });
+              } catch (e) {
+                const msg = (e as Error).message;
+                console.error('edit-order kitchen webhook error', msg);
+                webhookErrors.push({ type: 'kitchen', error: msg });
+              }
+            } else {
+              console.log('edit-order skipping kitchen webhook (no item changes)', { order_number: existingOrder.order_number });
             }
+
+            // Always send cashier webhook
+            const cashierB64 = toB64(cashierPdf);
 
             try {
               const payloadCashier = {
@@ -311,8 +334,19 @@ Deno.serve(async (req) => {
                 direccion_envio: updatedOrder?.direccion_envio || existingOrder.direccion_envio || null,
                 monto: (updatedOrder?.monto ?? existingOrder.monto),
                 metodo_pago: updatedOrder?.metodo_pago || existingOrder.metodo_pago || null,
+                address_changed: addressChanged,
+                phone_changed: phoneChanged,
+                payment_changed: paymentChanged,
               };
-              console.log('edit-order sending cashier webhook', { order_number: existingOrder.order_number, added_count: added.length, removed_count: removed.length, isSwap });
+              console.log('edit-order sending cashier webhook', { 
+                order_number: existingOrder.order_number, 
+                added_count: added.length, 
+                removed_count: removed.length, 
+                isSwap,
+                addressChanged,
+                phoneChanged,
+                paymentChanged
+              });
               const rc = await fetch(cashierWebhookUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
