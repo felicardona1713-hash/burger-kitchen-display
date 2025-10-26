@@ -1,4 +1,6 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1/dist/pdf-lib.esm.js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -102,15 +104,148 @@ Deno.serve(async (req) => {
 
     console.log('Order updated successfully:', updatedOrder);
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        order: updatedOrder 
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    // Prepare modification printouts for kitchen and cashier when items changed
+    const webhookErrors: Array<{ type: string; error: string }> = [];
+
+    try {
+      if (Array.isArray(items)) {
+        const oldItems = Array.isArray(existingOrder.items) ? existingOrder.items as any[] : [];
+        const newItems = items as any[];
+
+        const jsonEq = (a: any, b: any) => JSON.stringify(a || null) === JSON.stringify(b || null);
+
+        const added: any[] = [];
+        const removed: any[] = [];
+
+        // Find added items or increased quantities
+        newItems.forEach((ni) => {
+          const match = oldItems.find((oi) =>
+            oi.burger_type === ni.burger_type &&
+            oi.patty_size === ni.patty_size &&
+            oi.combo === ni.combo &&
+            jsonEq(oi.additions, ni.additions) &&
+            jsonEq(oi.removals, ni.removals)
+          );
+          if (!match) {
+            added.push(ni);
+          } else if ((match.quantity || 0) < (ni.quantity || 0)) {
+            added.push({ ...ni, quantity: (ni.quantity || 0) - (match.quantity || 0) });
+          }
+        });
+
+        // Find removed items or decreased quantities
+        oldItems.forEach((oi) => {
+          const match = newItems.find((ni) =>
+            ni.burger_type === oi.burger_type &&
+            ni.patty_size === oi.patty_size &&
+            ni.combo === oi.combo &&
+            jsonEq(ni.additions, oi.additions) &&
+            jsonEq(ni.removals, oi.removals)
+          );
+          if (!match) {
+            removed.push(oi);
+          } else if ((match.quantity || 0) < (oi.quantity || 0)) {
+            removed.push({ ...oi, quantity: (oi.quantity || 0) - (match.quantity || 0) });
+          }
+        });
+
+        const hasChanges = added.length > 0 || removed.length > 0;
+
+        // Detect simple swap (one removed and one added with same qty)
+        const isSwap = added.length === 1 && removed.length === 1 &&
+          (added[0].quantity || 0) === (removed[0].quantity || 0);
+
+        if (hasChanges) {
+          const kitchenWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCocina';
+          const cashierWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCaja';
+
+          const formatItem = (item: any) => {
+            let t = `${item.quantity || 1}x ${item.burger_type} ${item.patty_size}`;
+            if (item.combo) t += ' (combo)';
+            if (item.additions && item.additions.length) t += ` + ${item.additions.join(', ')}`;
+            if (item.removals && item.removals.length) t += ` - ${item.removals.join(', ')}`;
+            return t;
+          };
+
+          const generatePDF = async (type: 'kitchen' | 'cashier') => {
+            const pdfDoc = await PDFDocument.create();
+            const page = pdfDoc.addPage([226, 300]);
+            const font = await pdfDoc.embedFont(StandardFonts.Courier);
+            const lineHeight = 12;
+            let y = 280;
+            const add = (text: string, size = 10, extra = 0) => {
+              page.drawText(text, { x: 10, y, size, font, color: rgb(0,0,0) });
+              y -= lineHeight + extra;
+            };
+
+            if (isSwap) {
+              add(type === 'kitchen' ? 'COCINA' : 'CAJA', 12, 2);
+              add(`🔁 CAMBIO PEDIDO #${existingOrder.order_number}`, 11, 2);
+              add(`${formatItem(removed[0]).replace(/^\d+x\s/, '')} → ${formatItem(added[0]).replace(/^\d+x\s/, '')}`, 10, 2);
+            } else {
+              add(type === 'kitchen' ? 'COCINA' : 'CAJA', 12, 2);
+              add(`🔄 MODIFICACIÓN PEDIDO #${existingOrder.order_number}`, 11, 2);
+              if (removed.length) {
+                add('❌ QUITAR:', 10, 0);
+                removed.forEach((it: any) => add(`- ${formatItem(it)}`, 10));
+                y -= 4;
+              }
+              if (added.length) {
+                add('✅ AGREGAR:', 10, 0);
+                added.forEach((it: any) => add(`+ ${formatItem(it)}`, 10));
+              }
+            }
+
+            if (type === 'cashier') {
+              y -= 6; add(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`, 9);
+            }
+
+            return await pdfDoc.save();
+          };
+
+          // Generate PDFs
+          try {
+            const kitchenPdf = await generatePDF('kitchen');
+            const cashierPdf = await generatePDF('cashier');
+
+            const toB64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+            const kitchenB64 = toB64(kitchenPdf);
+            const cashierB64 = toB64(cashierPdf);
+
+            // Send webhooks
+            try {
+              const r = await fetch(kitchenWebhookUrl, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_number: existingOrder.order_number, pdf: kitchenB64, nombre: updatedOrder?.nombre || existingOrder.nombre })
+              });
+              if (!r.ok) throw new Error(`Kitchen webhook ${r.status}`);
+            } catch (e) { webhookErrors.push({ type: 'kitchen', error: (e as Error).message }); }
+
+            try {
+              const r = await fetch(cashierWebhookUrl, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_number: existingOrder.order_number, pdf: cashierB64, nombre: updatedOrder?.nombre || existingOrder.nombre })
+              });
+              if (!r.ok) throw new Error(`Cashier webhook ${r.status}`);
+            } catch (e) { webhookErrors.push({ type: 'cashier', error: (e as Error).message }); }
+          } catch (e) {
+            webhookErrors.push({ type: 'pdf', error: (e as Error).message });
+          }
+
+          return new Response(
+            JSON.stringify({ success: true, order: updatedOrder, added, removed, isSwap, webhookErrors: webhookErrors.length ? webhookErrors : undefined }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
+    } catch (e) {
+      webhookErrors.push({ type: 'unexpected', error: (e as Error).message });
+    }
+
+    // No item changes or print fallback
+    return new Response(
+      JSON.stringify({ success: true, order: updatedOrder }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
