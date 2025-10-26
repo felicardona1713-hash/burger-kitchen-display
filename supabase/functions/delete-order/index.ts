@@ -69,16 +69,16 @@ Deno.serve(async (req) => {
 
     const existingOrder = orders[0];
 
-    // Check if order was created within last 10 minutes
+    // Check if order was created within last 15 minutes
     const orderCreatedAt = new Date(existingOrder.created_at);
     const now = new Date();
     const timeDiffMinutes = (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60);
 
-    if (timeDiffMinutes > 10) {
+    if (timeDiffMinutes > 15) {
       return new Response(
         JSON.stringify({ 
           error: 'Cannot delete order', 
-          details: 'Order is older than 10 minutes and cannot be deleted'
+          details: 'Order is older than 15 minutes and cannot be deleted'
         }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
