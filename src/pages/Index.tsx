@@ -140,7 +140,7 @@ const Index = () => {
           if (updatedOrder.status === 'completed') {
             setPendingOrders(prev => prev.filter(order => order.id !== updatedOrder.id));
             setCompletedOrders(prev => [updatedOrder, ...prev]);
-          } else if (updatedOrder.status === 'pending') {
+          } else {
             // Comparar items y imprimir cambios
             if (oldOrder.items && updatedOrder.items) {
               const changes = compareItemsAndPrintChanges(oldOrder, updatedOrder);
@@ -152,9 +152,12 @@ const Index = () => {
               }
             }
             
+            // Mezclar los cambios con el pedido existente para no perder campos no enviados en el payload
             setPendingOrders(prev => 
               prev.map(order => 
-                order.id === updatedOrder.id ? updatedOrder : order
+                order.id === updatedOrder.id
+                  ? { ...order, ...updatedOrder }
+                  : order
               )
             );
           }
