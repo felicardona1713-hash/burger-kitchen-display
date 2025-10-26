@@ -206,18 +206,18 @@ Deno.serve(async (req) => {
 
             if (isSwap) {
               add(type === 'kitchen' ? 'COCINA' : 'CAJA', 12, 2);
-              add(`🔁 CAMBIO PEDIDO #${existingOrder.order_number}`, 11, 2);
-              add(`${formatItem(removed[0]).replace(/^\d+x\s/, '')} → ${formatItem(added[0]).replace(/^\d+x\s/, '')}`, 10, 2);
+              add(`CAMBIO PEDIDO #${existingOrder.order_number}`, 11, 2);
+              add(`${formatItem(removed[0]).replace(/^\d+x\s/, '')} -> ${formatItem(added[0]).replace(/^\d+x\s/, '')}`, 10, 2);
             } else {
               add(type === 'kitchen' ? 'COCINA' : 'CAJA', 12, 2);
-              add(`🔄 MODIFICACIÓN PEDIDO #${existingOrder.order_number}`, 11, 2);
+              add(`MODIFICACION PEDIDO #${existingOrder.order_number}`, 11, 2);
               if (removed.length) {
-                add('❌ QUITAR:', 10, 0);
+                add('QUITAR:', 10, 0);
                 removed.forEach((it: any) => add(`- ${formatItem(it)}`, 10));
                 y -= 4;
               }
               if (added.length) {
-                add('✅ AGREGAR:', 10, 0);
+                add('AGREGAR:', 10, 0);
                 added.forEach((it: any) => add(`+ ${formatItem(it)}`, 10));
               }
             }
