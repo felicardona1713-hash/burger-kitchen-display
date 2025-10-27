@@ -329,15 +329,32 @@ const Index = () => {
 
   const printOrderChanges = (order: Order, added: OrderItem[], removed: OrderItem[]) => {
     const formatItem = (item: OrderItem) => {
-      let itemText = `${item.burger_type} ${item.patty_size}`;
-      if (item.combo) itemText += ' en Combo';
+      let parts: string[] = [];
+      
+      // Tipo de burger y tamaño
+      parts.push(`${item.burger_type}`);
+      parts.push(`${item.patty_size}`);
+      
+      // Combo
+      if (item.combo) {
+        parts.push('combo');
+      }
+      
+      // Modificaciones
+      const mods: string[] = [];
       if (item.additions && item.additions.length > 0) {
-        itemText += ` (con ${item.additions.join(', ')})`;
+        mods.push(`+${item.additions.join(', ')}`);
       }
       if (item.removals && item.removals.length > 0) {
-        itemText += ` (sin ${item.removals.join(', ')})`;
+        mods.push(`-${item.removals.join(', ')}`);
       }
-      return itemText;
+      
+      let result = parts.join(' ');
+      if (mods.length > 0) {
+        result += `\n  ${mods.join(' ')}`;
+      }
+      
+      return result;
     };
 
     const printContent = `
@@ -351,7 +368,7 @@ const Index = () => {
               width: 80mm;
               margin: 0;
               padding: 10px;
-              font-size: 13px;
+              font-size: 12px;
             }
             .header {
               text-align: center;
@@ -360,7 +377,7 @@ const Index = () => {
               border-bottom: 2px dashed #000;
             }
             .title {
-              font-size: 20px;
+              font-size: 18px;
               font-weight: bold;
               margin-bottom: 5px;
             }
@@ -371,26 +388,37 @@ const Index = () => {
             }
             .order-info {
               margin-bottom: 15px;
-              font-size: 14px;
+              font-size: 13px;
             }
             .section {
               margin: 15px 0;
+              page-break-inside: avoid;
             }
             .section-title {
               font-weight: bold;
-              font-size: 15px;
+              font-size: 14px;
               margin-bottom: 8px;
+              text-decoration: underline;
             }
             .item {
-              margin: 5px 0 5px 15px;
-              font-size: 13px;
-              line-height: 1.4;
+              margin: 8px 0;
+              padding-left: 5px;
+              font-size: 12px;
+              line-height: 1.5;
+              white-space: pre-wrap;
+              word-wrap: break-word;
             }
-            .added-item {
-              color: #000;
+            .item-qty {
+              font-weight: bold;
+              margin-right: 5px;
             }
-            .removed-item {
-              color: #000;
+            .added-section {
+              border-left: 3px solid #000;
+              padding-left: 10px;
+            }
+            .removed-section {
+              border-left: 3px solid #666;
+              padding-left: 10px;
             }
             .footer {
               text-align: center;
@@ -409,8 +437,8 @@ const Index = () => {
         </head>
         <body>
           <div class="header">
-            <div class="title">🔄 MODIFICACIÓN</div>
-            <div class="modification-badge">PEDIDO #${order.order_number}</div>
+            <div class="title">COCINA</div>
+            <div class="modification-badge">CAMBIO PEDIDO #${order.order_number}</div>
           </div>
           
           <div class="order-info">
@@ -418,26 +446,26 @@ const Index = () => {
           </div>
           
           ${removed.length > 0 ? `
-            <div class="section">
-              <div class="section-title">❌ QUITAR:</div>
+            <div class="section removed-section">
+              <div class="section-title">QUITAR:</div>
               ${removed.map(item => `
-                <div class="item removed-item">- ${formatItem(item)}${item.quantity > 1 ? ` (x${item.quantity})` : ''}</div>
+                <div class="item"><span class="item-qty">${item.quantity > 1 ? `${item.quantity}x` : ''}</span>${formatItem(item)}</div>
               `).join('')}
             </div>
           ` : ''}
           
           ${added.length > 0 ? `
-            <div class="section">
-              <div class="section-title">✅ AGREGAR:</div>
+            <div class="section added-section">
+              <div class="section-title">AGREGAR:</div>
               ${added.map(item => `
-                <div class="item added-item">+ ${formatItem(item)}${item.quantity > 1 ? ` (x${item.quantity})` : ''}</div>
+                <div class="item"><span class="item-qty">${item.quantity > 1 ? `${item.quantity}x` : ''}</span>${formatItem(item)}</div>
               `).join('')}
             </div>
           ` : ''}
           
           <div class="footer">
             ${new Date().toLocaleTimeString('es-AR')}<br>
-            COMANDA DE MODIFICACIÓN
+            MODIFICACION
           </div>
         </body>
       </html>
