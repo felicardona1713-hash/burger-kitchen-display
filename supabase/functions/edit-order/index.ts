@@ -205,13 +205,58 @@ Deno.serve(async (req) => {
 
           const generatePDF = async (type: 'kitchen' | 'cashier') => {
             const pdfDoc = await PDFDocument.create();
-            const page = pdfDoc.addPage([226, 400]);
+            const width = 226;
+            const height = 600; // taller para evitar recortes
+            const margin = 10;
+            const page = pdfDoc.addPage([width, height]);
             const font = await pdfDoc.embedFont(StandardFonts.Courier);
             const lineHeight = 12;
-            let y = 380;
+            let y = height - margin - 8;
+
             const add = (text: string, size = 10, extra = 0) => {
-              page.drawText(text, { x: 10, y, size, font, color: rgb(0,0,0) });
+              page.drawText(text, { x: margin, y, size, font, color: rgb(0,0,0) });
               y -= lineHeight + extra;
+            };
+
+            const maxWidth = width - margin * 2;
+            const wrapText = (text: string, size = 10) => {
+              const words = (text ?? '').toString().split(' ');
+              const lines: string[] = [];
+              let line = '';
+              for (const word of words) {
+                const testLine = line ? `${line} ${word}` : word;
+                if (font.widthOfTextAtSize(testLine, size) <= maxWidth) {
+                  line = testLine;
+                } else {
+                  if (line) lines.push(line);
+                  // si una palabra sola es más larga que el ancho, cortamos por caracteres
+                  if (font.widthOfTextAtSize(word, size) > maxWidth) {
+                    let part = '';
+                    for (const ch of word) {
+                      const testPart = part + ch;
+                      if (font.widthOfTextAtSize(testPart, size) <= maxWidth) {
+                        part = testPart;
+                      } else {
+                        if (part) lines.push(part);
+                        part = ch;
+                      }
+                    }
+                    line = part;
+                  } else {
+                    line = word;
+                  }
+                }
+              }
+              if (line) lines.push(line);
+              return lines;
+            };
+
+            const addWrapped = (text: string, size = 10, extra = 0) => {
+              const lines = wrapText(text, size);
+              for (const ln of lines) {
+                add(ln, size, 0);
+              }
+              if (extra) y -= extra;
             };
 
             if (type === 'kitchen') {
@@ -250,7 +295,7 @@ Deno.serve(async (req) => {
                 if (isAdded) itemText += ' (AGREGADA)';
                 if (isRemoved) itemText += ' (CANCELADA)';
                 
-                add(itemText, 9);
+                addWrapped(itemText, 9);
               });
               
               y -= 4;
@@ -258,11 +303,11 @@ Deno.serve(async (req) => {
               const dir = updatedOrder?.direccion_envio || existingOrder.direccion_envio;
               const pago = updatedOrder?.metodo_pago || existingOrder.metodo_pago;
               
-              if (tel) add(`Tel: ${tel}`, 9);
+              if (tel) addWrapped(`Tel: ${tel}`, 9);
               if (dir) {
-                add(`Domicilio: ${dir}${addressChanged ? ' (NUEVO)' : ''}`, 9);
+                addWrapped(`Domicilio: ${dir}${addressChanged ? ' (NUEVO)' : ''}`, 9);
               }
-              if (pago) add(`Pago: ${pago}${paymentChanged ? ' (NUEVO)' : ''}`, 9);
+              if (pago) addWrapped(`Pago: ${pago}${paymentChanged ? ' (NUEVO)' : ''}`, 9);
               add(`Monto: $${updatedOrder?.monto ?? existingOrder.monto}`, 10);
             }
 
