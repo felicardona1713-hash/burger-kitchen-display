@@ -215,24 +215,18 @@ Deno.serve(async (req) => {
             };
 
             if (type === 'kitchen') {
-              // COCINA: Solo mostrar cambios de items
+              // COCINA: Mostrar cambios de items con secciones claras
               if (hasItemChanges) {
-                if (isSwap) {
-                  add('COCINA', 12, 2);
-                  add(`CAMBIO PEDIDO #${existingOrder.order_number}`, 11, 2);
-                  add(`${formatItem(removed[0]).replace(/^\d+x\s/, '')} -> ${formatItem(added[0]).replace(/^\d+x\s/, '')}`, 10, 2);
-                } else {
-                  add('COCINA', 12, 2);
-                  add(`MODIFICACION PEDIDO #${existingOrder.order_number}`, 11, 2);
-                  if (removed.length) {
-                    add('QUITAR:', 10, 0);
-                    removed.forEach((it: any) => add(`- ${formatItem(it)}`, 10));
-                    y -= 4;
-                  }
-                  if (added.length) {
-                    add('AGREGAR:', 10, 0);
-                    added.forEach((it: any) => add(`+ ${formatItem(it)}`, 10));
-                  }
+                add('COCINA', 12, 2);
+                add(`MODIFICACION PEDIDO #${existingOrder.order_number}`, 11, 2);
+                if (removed.length) {
+                  add('QUITAR:', 10, 0);
+                  removed.forEach((it: any) => add(`- ${formatItem(it)}`, 10));
+                  y -= 4;
+                }
+                if (added.length) {
+                  add('AGREGAR:', 10, 0);
+                  added.forEach((it: any) => add(`+ ${formatItem(it)}`, 10));
                 }
               } else {
                 // Si solo cambió dirección/teléfono/pago, no enviar a cocina
