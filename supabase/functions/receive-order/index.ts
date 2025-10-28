@@ -136,6 +136,8 @@ serve(async (req) => {
       const LEFT = [ESC, 0x61, 0x00];
       const BOLD_ON = [ESC, 0x45, 0x01];
       const BOLD_OFF = [ESC, 0x45, 0x00];
+      const DOUBLE_SIZE = [ESC, 0x21, 0x30]; // Double width and height
+      const NORMAL_SIZE = [ESC, 0x21, 0x00]; // Normal size
       const CUT = [GS, 0x56, 0x00];
       
       const addBytes = (...b: number[]) => bytes.push(...b);
@@ -149,84 +151,111 @@ serve(async (req) => {
       };
       const newLine = () => addBytes(LF);
       
+      // Initialize with center alignment and larger font
+      addBytes(...CENTER, ...DOUBLE_SIZE);
+      
       if (type === 'kitchen') {
         // Kitchen ticket - Order items for preparation
-        addBytes(...CENTER, ...BOLD_ON);
+        addBytes(...BOLD_ON);
         addText('COCINA');
         addBytes(...BOLD_OFF, LF);
-        addBytes(...LEFT);
         addLine();
         addBytes(...BOLD_ON);
         addText(`PEDIDO #${data.order_number}`);
         addBytes(...BOLD_OFF, LF);
         addLine();
+        newLine();
         
         // Print all items
         data.items.forEach((item: any) => {
-          let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
-          if (item.combo) itemDesc += ' (combo)';
+          let itemDesc = `${item.quantity}x ${item.burger_type}`;
+          newLine();
           addText(itemDesc);
+          newLine();
+          addText(`${item.patty_size}`);
+          if (item.combo) {
+            newLine();
+            addText('(combo)');
+          }
           newLine();
           
           if (item.additions && item.additions.length > 0) {
-            addText(`  + ${item.additions.join(', ')}`);
+            newLine();
+            addText(`+ ${item.additions.join(', ')}`);
             newLine();
           }
           if (item.removals && item.removals.length > 0) {
-            addText(`  - ${item.removals.join(', ')}`);
+            newLine();
+            addText(`- ${item.removals.join(', ')}`);
             newLine();
           }
+          newLine();
         });
         
       } else {
         // Cashier ticket - Complete order details
-        addBytes(...CENTER, ...BOLD_ON);
+        addBytes(...BOLD_ON);
         addText('CAJA');
         addBytes(...BOLD_OFF, LF);
-        addBytes(...LEFT);
         addLine();
         addBytes(...BOLD_ON);
         addText(`PEDIDO #${data.order_number}`);
         addBytes(...BOLD_OFF, LF);
         addLine();
+        newLine();
         addText(`Cliente: ${data.nombre}`);
         newLine();
         if (data.telefono) {
+          newLine();
           addText(`Tel: ${data.telefono}`);
           newLine();
         }
         if (data.direccion_envio) {
-          addText(`Entrega: ${data.direccion_envio}`);
+          newLine();
+          addText(`Entrega:`);
+          newLine();
+          addText(`${data.direccion_envio}`);
           newLine();
         }
-        addText('--------------------------------');
+        newLine();
+        addLine();
         newLine();
         
         // Print all items with prices
         data.items.forEach((item: any) => {
-          let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
-          if (item.combo) itemDesc += ' (combo)';
+          let itemDesc = `${item.quantity}x ${item.burger_type}`;
           addText(itemDesc);
+          newLine();
+          addText(`${item.patty_size}`);
+          if (item.combo) {
+            addText(' (combo)');
+          }
           newLine();
           
           if (item.additions && item.additions.length > 0) {
-            addText(`  + ${item.additions.join(', ')}`);
+            newLine();
+            addText(`+ ${item.additions.join(', ')}`);
             newLine();
           }
           if (item.removals && item.removals.length > 0) {
-            addText(`  - ${item.removals.join(', ')}`);
+            newLine();
+            addText(`- ${item.removals.join(', ')}`);
             newLine();
           }
           if (item.price) {
-            addText(`  $${parseFloat(item.price).toLocaleString('es-AR')}`);
+            newLine();
+            addText(`$${parseFloat(item.price).toLocaleString('es-AR')}`);
             newLine();
           }
+          newLine();
         });
         
         addLine();
+        newLine();
         addBytes(...BOLD_ON);
         addText(`TOTAL: $${parseFloat(data.monto).toLocaleString('es-AR')}`);
         addBytes(...BOLD_OFF, LF);
+        newLine();
         addText(`Pago: ${data.metodo_pago}`);
         newLine();
       }

@@ -213,6 +213,8 @@ Deno.serve(async (req) => {
             const LEFT = [ESC, 0x61, 0x00];
             const BOLD_ON = [ESC, 0x45, 0x01];
             const BOLD_OFF = [ESC, 0x45, 0x00];
+            const DOUBLE_SIZE = [ESC, 0x21, 0x30]; // Double width and height
+            const NORMAL_SIZE = [ESC, 0x21, 0x00]; // Normal size
             const CUT = [GS, 0x56, 0x00];
             
             const addBytes = (...b: number[]) => bytes.push(...b);
@@ -221,77 +223,105 @@ Deno.serve(async (req) => {
               addBytes(...Array.from(encoder.encode(text)));
             };
             const addLine = () => {
-              addText('--------------------------------');
+              addText('================================');
               addBytes(LF);
             };
             const newLine = () => addBytes(LF);
+            
+            // Initialize with center alignment and larger font
+            addBytes(...CENTER, ...DOUBLE_SIZE);
 
             if (type === 'kitchen') {
               if (hasItemChanges) {
-                addBytes(...CENTER, ...BOLD_ON);
+                addBytes(...BOLD_ON);
                 addText('COCINA');
                 addBytes(...BOLD_OFF, LF);
-                addBytes(...CENTER);
-                addText(`MODIFICACION PEDIDO #${existingOrder.order_number}`);
-                addBytes(LF);
-                addBytes(...LEFT);
+                newLine();
+                addText('MODIFICACION');
+                newLine();
                 addLine();
+                addBytes(...BOLD_ON);
+                addText(`PEDIDO #${existingOrder.order_number}`);
+                addBytes(...BOLD_OFF, LF);
+                addLine();
+                newLine();
                 
                 if (removed.length) {
                   addBytes(...BOLD_ON);
                   addText('QUITAR:');
                   addBytes(...BOLD_OFF, LF);
+                  newLine();
                   removed.forEach((it: any) => {
-                    addText(`- ${formatItem(it)}`);
+                    addText(`${it.quantity}x ${it.burger_type}`);
+                    newLine();
+                    addText(`${it.patty_size}`);
+                    if (it.combo) {
+                      newLine();
+                      addText('(combo)');
+                    }
+                    newLine();
+                    if (it.additions && it.additions.length > 0) {
+                      newLine();
+                      addText(`+ ${it.additions.join(', ')}`);
+                      newLine();
+                    }
+                    if (it.removals && it.removals.length > 0) {
+                      newLine();
+                      addText(`- ${it.removals.join(', ')}`);
+                      newLine();
+                    }
                     newLine();
                   });
-                  newLine();
                 }
                 if (added.length) {
                   addBytes(...BOLD_ON);
                   addText('AGREGAR:');
                   addBytes(...BOLD_OFF, LF);
+                  newLine();
                   added.forEach((it: any) => {
-                    addText(`+ ${formatItem(it)}`);
+                    addText(`${it.quantity}x ${it.burger_type}`);
+                    newLine();
+                    addText(`${it.patty_size}`);
+                    if (it.combo) {
+                      newLine();
+                      addText('(combo)');
+                    }
+                    newLine();
+                    if (it.additions && it.additions.length > 0) {
+                      newLine();
+                      addText(`+ ${it.additions.join(', ')}`);
+                      newLine();
+                    }
+                    if (it.removals && it.removals.length > 0) {
+                      newLine();
+                      addText(`- ${it.removals.join(', ')}`);
+                      newLine();
+                    }
                     newLine();
                   });
                 }
-                addLine();
                 addBytes(LF, LF, LF);
                 addBytes(...CUT);
               } else {
                 return null;
               }
             } else {
-              addBytes(...CENTER, ...BOLD_ON);
+              addBytes(...BOLD_ON);
               addText('CAJA');
               addBytes(...BOLD_OFF, LF);
-              addBytes(...CENTER);
-              addText(`MODIFICACION PEDIDO #${existingOrder.order_number}`);
-              addBytes(LF);
-              addBytes(...LEFT);
-              addText(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`);
-              addBytes(LF);
-              addLine();
-              
-              addBytes(...BOLD_ON);
-              addText('PEDIDO COMPLETO:');
-              addBytes(...BOLD_OFF, LF);
-              
-              const finalItems = updatedOrder?.items || existingOrder.items || [];
-              finalItems.forEach((item: any) => {
-                const isAdded = added.some((a: any) => isSameItem(a, item));
-                const isRemoved = removed.some((r: any) => isSameItem(r, item));
-                
-                let itemText = formatItem(item);
-                if (isAdded) itemText += ' (AGREGADA)';
-                if (isRemoved) itemText += ' (CANCELADA)';
-                
-                addText(itemText);
-                newLine();
-              });
-              
               newLine();
+              addText('MODIFICACION');
+              newLine();
+              addLine();
+              addBytes(...BOLD_ON);
+              addText(`PEDIDO #${existingOrder.order_number}`);
+              addBytes(...BOLD_OFF, LF);
+              addLine();
+              newLine();
+              addText(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`);
+              newLine();
+              newLine();
+              
               const tel = updatedOrder?.telefono || existingOrder.telefono;
               const dir = updatedOrder?.direccion_envio || existingOrder.direccion_envio;
               const pago = updatedOrder?.metodo_pago || existingOrder.metodo_pago;
@@ -301,18 +331,77 @@ Deno.serve(async (req) => {
                 newLine();
               }
               if (dir) {
-                addText(`Domicilio: ${dir}${addressChanged ? ' (NUEVO)' : ''}`);
+                newLine();
+                addText(`Entrega:`);
+                newLine();
+                addText(`${dir}`);
+                if (addressChanged) {
+                  addText(' (NUEVO)');
+                }
                 newLine();
               }
               if (pago) {
-                addText(`Pago: ${pago}${paymentChanged ? ' (NUEVO)' : ''}`);
+                newLine();
+                addText(`Pago: ${pago}`);
+                if (paymentChanged) {
+                  addText(' (NUEVO)');
+                }
                 newLine();
               }
+              
+              newLine();
               addLine();
+              newLine();
+              
               addBytes(...BOLD_ON);
-              addText(`Monto: $${updatedOrder?.monto ?? existingOrder.monto}`);
+              addText('PEDIDO COMPLETO:');
               addBytes(...BOLD_OFF, LF);
+              newLine();
+              
+              const finalItems = updatedOrder?.items || existingOrder.items || [];
+              finalItems.forEach((item: any) => {
+                const isAdded = added.some((a: any) => isSameItem(a, item));
+                const isRemoved = removed.some((r: any) => isSameItem(r, item));
+                
+                addText(`${item.quantity}x ${item.burger_type}`);
+                newLine();
+                addText(`${item.patty_size}`);
+                if (item.combo) {
+                  addText(' (combo)');
+                }
+                if (isAdded) {
+                  addText(' (NUEVA)');
+                }
+                if (isRemoved) {
+                  addText(' (CANCELADA)');
+                }
+                newLine();
+                
+                if (item.additions && item.additions.length > 0) {
+                  newLine();
+                  addText(`+ ${item.additions.join(', ')}`);
+                  newLine();
+                }
+                if (item.removals && item.removals.length > 0) {
+                  newLine();
+                  addText(`- ${item.removals.join(', ')}`);
+                  newLine();
+                }
+                if (item.price) {
+                  newLine();
+                  addText(`$${parseFloat(item.price).toLocaleString('es-AR')}`);
+                  newLine();
+                }
+                newLine();
+              });
+              
               addLine();
+              newLine();
+              addBytes(...BOLD_ON);
+              addText(`TOTAL:`);
+              newLine();
+              addText(`$${(updatedOrder?.monto ?? existingOrder.monto).toLocaleString('es-AR')}`);
+              addBytes(...BOLD_OFF, LF);
               addBytes(LF, LF, LF);
               addBytes(...CUT);
             }
