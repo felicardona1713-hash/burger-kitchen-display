@@ -169,28 +169,22 @@ serve(async (req) => {
         
         // Print all items
         data.items.forEach((item: any) => {
-          let itemDesc = `${item.quantity}x ${item.burger_type}`;
+          let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
+          if (item.combo) {
+            itemDesc += ' (combo)';
+          }
           newLine();
           addText(itemDesc);
           newLine();
-          addText(`${item.patty_size}`);
-          if (item.combo) {
-            newLine();
-            addText('(combo)');
-          }
-          newLine();
           
           if (item.additions && item.additions.length > 0) {
-            newLine();
             addText(`+ ${item.additions.join(', ')}`);
             newLine();
           }
           if (item.removals && item.removals.length > 0) {
-            newLine();
             addText(`- ${item.removals.join(', ')}`);
             newLine();
           }
-          newLine();
         });
         
       } else {
@@ -224,31 +218,25 @@ serve(async (req) => {
         
         // Print all items with prices
         data.items.forEach((item: any) => {
-          let itemDesc = `${item.quantity}x ${item.burger_type}`;
-          addText(itemDesc);
-          newLine();
-          addText(`${item.patty_size}`);
+          let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
           if (item.combo) {
-            addText(' (combo)');
+            itemDesc += ' (combo)';
           }
+          if (item.price) {
+            itemDesc += ` $${parseFloat(item.price).toLocaleString('es-AR')}`;
+          }
+          newLine();
+          addText(itemDesc);
           newLine();
           
           if (item.additions && item.additions.length > 0) {
-            newLine();
             addText(`+ ${item.additions.join(', ')}`);
             newLine();
           }
           if (item.removals && item.removals.length > 0) {
-            newLine();
             addText(`- ${item.removals.join(', ')}`);
             newLine();
           }
-          if (item.price) {
-            newLine();
-            addText(`$${parseFloat(item.price).toLocaleString('es-AR')}`);
-            newLine();
-          }
-          newLine();
         });
         
         addLine();

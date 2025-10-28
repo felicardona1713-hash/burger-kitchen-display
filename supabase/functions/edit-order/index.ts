@@ -253,25 +253,22 @@ Deno.serve(async (req) => {
                   addBytes(...BOLD_OFF, LF);
                   newLine();
                   removed.forEach((it: any) => {
-                    addText(`${it.quantity}x ${it.burger_type}`);
-                    newLine();
-                    addText(`${it.patty_size}`);
+                    let itemDesc = `${it.quantity}x ${it.burger_type} ${it.patty_size}`;
                     if (it.combo) {
-                      newLine();
-                      addText('(combo)');
+                      itemDesc += ' (combo)';
                     }
                     newLine();
+                    addText(itemDesc);
+                    newLine();
+                    
                     if (it.additions && it.additions.length > 0) {
-                      newLine();
                       addText(`+ ${it.additions.join(', ')}`);
                       newLine();
                     }
                     if (it.removals && it.removals.length > 0) {
-                      newLine();
                       addText(`- ${it.removals.join(', ')}`);
                       newLine();
                     }
-                    newLine();
                   });
                 }
                 if (added.length) {
@@ -280,25 +277,22 @@ Deno.serve(async (req) => {
                   addBytes(...BOLD_OFF, LF);
                   newLine();
                   added.forEach((it: any) => {
-                    addText(`${it.quantity}x ${it.burger_type}`);
-                    newLine();
-                    addText(`${it.patty_size}`);
+                    let itemDesc = `${it.quantity}x ${it.burger_type} ${it.patty_size}`;
                     if (it.combo) {
-                      newLine();
-                      addText('(combo)');
+                      itemDesc += ' (combo)';
                     }
                     newLine();
+                    addText(itemDesc);
+                    newLine();
+                    
                     if (it.additions && it.additions.length > 0) {
-                      newLine();
                       addText(`+ ${it.additions.join(', ')}`);
                       newLine();
                     }
                     if (it.removals && it.removals.length > 0) {
-                      newLine();
                       addText(`- ${it.removals.join(', ')}`);
                       newLine();
                     }
-                    newLine();
                   });
                 }
                 addBytes(LF, LF, LF, LF, LF);
@@ -364,36 +358,31 @@ Deno.serve(async (req) => {
                 const isAdded = added.some((a: any) => isSameItem(a, item));
                 const isRemoved = removed.some((r: any) => isSameItem(r, item));
                 
-                addText(`${item.quantity}x ${item.burger_type}`);
-                newLine();
-                addText(`${item.patty_size}`);
+                let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
                 if (item.combo) {
-                  addText(' (combo)');
+                  itemDesc += ' (combo)';
                 }
                 if (isAdded) {
-                  addText(' (NUEVA)');
+                  itemDesc += ' (NUEVA)';
                 }
                 if (isRemoved) {
-                  addText(' (CANCELADA)');
+                  itemDesc += ' (CANCELADA)';
                 }
+                if (item.price) {
+                  itemDesc += ` $${parseFloat(item.price).toLocaleString('es-AR')}`;
+                }
+                newLine();
+                addText(itemDesc);
                 newLine();
                 
                 if (item.additions && item.additions.length > 0) {
-                  newLine();
                   addText(`+ ${item.additions.join(', ')}`);
                   newLine();
                 }
                 if (item.removals && item.removals.length > 0) {
-                  newLine();
                   addText(`- ${item.removals.join(', ')}`);
                   newLine();
                 }
-                if (item.price) {
-                  newLine();
-                  addText(`$${parseFloat(item.price).toLocaleString('es-AR')}`);
-                  newLine();
-                }
-                newLine();
               });
               
               addLine();
