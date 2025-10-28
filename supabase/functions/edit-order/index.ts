@@ -1,6 +1,5 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1/dist/pdf-lib.esm.js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -203,88 +202,45 @@ Deno.serve(async (req) => {
             return t;
           };
 
-          const generatePDF = async (type: 'kitchen' | 'cashier') => {
-            const pdfDoc = await PDFDocument.create();
-            const width = 227; // 80mm
-            const height = 567; // 200mm
-            const margin = 10;
-            const page = pdfDoc.addPage([width, height]);
-            const font = await pdfDoc.embedFont(StandardFonts.Courier);
-            const lineHeight = 12;
-            let y = height - margin - 8;
-
-            const add = (text: string, size = 10, extra = 0) => {
-              page.drawText(text, { x: margin, y, size, font, color: rgb(0,0,0) });
-              y -= lineHeight + extra;
-            };
-
-            const maxWidth = width - margin * 2;
-            const wrapText = (text: string, size = 10) => {
-              const words = (text ?? '').toString().split(' ');
-              const lines: string[] = [];
-              let line = '';
-              for (const word of words) {
-                const testLine = line ? `${line} ${word}` : word;
-                if (font.widthOfTextAtSize(testLine, size) <= maxWidth) {
-                  line = testLine;
-                } else {
-                  if (line) lines.push(line);
-                  // si una palabra sola es más larga que el ancho, cortamos por caracteres
-                  if (font.widthOfTextAtSize(word, size) > maxWidth) {
-                    let part = '';
-                    for (const ch of word) {
-                      const testPart = part + ch;
-                      if (font.widthOfTextAtSize(testPart, size) <= maxWidth) {
-                        part = testPart;
-                      } else {
-                        if (part) lines.push(part);
-                        part = ch;
-                      }
-                    }
-                    line = part;
-                  } else {
-                    line = word;
-                  }
-                }
-              }
-              if (line) lines.push(line);
-              return lines;
-            };
-
-            const addWrapped = (text: string, size = 10, extra = 0) => {
-              const lines = wrapText(text, size);
-              for (const ln of lines) {
-                add(ln, size, 0);
-              }
-              if (extra) y -= extra;
-            };
+          const generateTicketText = (type: 'kitchen' | 'cashier'): string | null => {
+            const lines: string[] = [];
+            const ESC = '\x1B';
+            const CENTER = `${ESC}a1`;
+            const LEFT = `${ESC}a0`;
+            const BOLD_ON = `${ESC}E1`;
+            const BOLD_OFF = `${ESC}E0`;
+            
+            const add = (text: string) => lines.push(text);
+            const addLine = () => lines.push('--------------------------------');
 
             if (type === 'kitchen') {
-              // COCINA: Mostrar cambios de items con secciones claras
               if (hasItemChanges) {
-                add('COCINA', 12, 2);
-                add(`MODIFICACION PEDIDO #${existingOrder.order_number}`, 11, 2);
+                add(`${CENTER}${BOLD_ON}COCINA${BOLD_OFF}`);
+                add(`${CENTER}MODIFICACION PEDIDO #${existingOrder.order_number}`);
+                add(`${LEFT}`);
+                addLine();
+                
                 if (removed.length) {
-                  add('QUITAR:', 10, 0);
-                  removed.forEach((it: any) => add(`- ${formatItem(it)}`, 10));
-                  y -= 4;
+                  add(`${BOLD_ON}QUITAR:${BOLD_OFF}`);
+                  removed.forEach((it: any) => add(`- ${formatItem(it)}`));
+                  add('');
                 }
                 if (added.length) {
-                  add('AGREGAR:', 10, 0);
-                  added.forEach((it: any) => add(`+ ${formatItem(it)}`, 10));
+                  add(`${BOLD_ON}AGREGAR:${BOLD_OFF}`);
+                  added.forEach((it: any) => add(`+ ${formatItem(it)}`));
                 }
+                addLine();
               } else {
-                // Si solo cambió dirección/teléfono/pago, no enviar a cocina
                 return null;
               }
             } else {
-              // CAJA: Mostrar pedido completo con marcas
-              add('CAJA', 12, 2);
-              add(`MODIFICACION PEDIDO #${existingOrder.order_number}`, 11, 2);
-              add(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`, 9, 2);
+              add(`${CENTER}${BOLD_ON}CAJA${BOLD_OFF}`);
+              add(`${CENTER}MODIFICACION PEDIDO #${existingOrder.order_number}`);
+              add(`${LEFT}`);
+              add(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`);
+              addLine();
               
-              y -= 4;
-              add('PEDIDO COMPLETO:', 10, 0);
+              add(`${BOLD_ON}PEDIDO COMPLETO:${BOLD_OFF}`);
               
               const finalItems = updatedOrder?.items || existingOrder.items || [];
               finalItems.forEach((item: any) => {
@@ -295,39 +251,40 @@ Deno.serve(async (req) => {
                 if (isAdded) itemText += ' (AGREGADA)';
                 if (isRemoved) itemText += ' (CANCELADA)';
                 
-                addWrapped(itemText, 9);
+                add(itemText);
               });
               
-              y -= 4;
+              add('');
               const tel = updatedOrder?.telefono || existingOrder.telefono;
               const dir = updatedOrder?.direccion_envio || existingOrder.direccion_envio;
               const pago = updatedOrder?.metodo_pago || existingOrder.metodo_pago;
               
-              if (tel) addWrapped(`Tel: ${tel}`, 9);
-              if (dir) {
-                addWrapped(`Domicilio: ${dir}${addressChanged ? ' (NUEVO)' : ''}`, 9);
-              }
-              if (pago) addWrapped(`Pago: ${pago}${paymentChanged ? ' (NUEVO)' : ''}`, 9);
-              add(`Monto: $${updatedOrder?.monto ?? existingOrder.monto}`, 10);
+              if (tel) add(`Tel: ${tel}`);
+              if (dir) add(`Domicilio: ${dir}${addressChanged ? ' (NUEVO)' : ''}`);
+              if (pago) add(`Pago: ${pago}${paymentChanged ? ' (NUEVO)' : ''}`);
+              addLine();
+              add(`${BOLD_ON}Monto: $${updatedOrder?.monto ?? existingOrder.monto}${BOLD_OFF}`);
+              addLine();
             }
 
-            return await pdfDoc.save();
+            add('\n\n\n');
+            return lines.join('\n');
           };
 
-          // Generate PDFs
+          // Generate tickets
           try {
-            const kitchenPdfResult = await generatePDF('kitchen');
-            const cashierPdf = await generatePDF('cashier');
+            const kitchenTicketText = generateTicketText('kitchen');
+            const cashierTicketText = generateTicketText('cashier');
 
-            const toB64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+            const toB64 = (text: string) => btoa(unescape(encodeURIComponent(text)));
 
             // Send kitchen webhook only if there are item changes
-            if (kitchenPdfResult !== null) {
-              const kitchenB64 = toB64(kitchenPdfResult);
+            if (kitchenTicketText !== null) {
+              const kitchenB64 = toB64(kitchenTicketText);
               try {
                 const payloadKitchen = {
                   order_number: existingOrder.order_number,
-                  pdf: kitchenB64,
+                  ticket: kitchenB64,
                   nombre: updatedOrder?.nombre || existingOrder.nombre,
                   items: (updatedOrder?.items || existingOrder.items || []),
                   items_added: added,
@@ -357,12 +314,12 @@ Deno.serve(async (req) => {
             }
 
             // Always send cashier webhook
-            const cashierB64 = toB64(cashierPdf);
+            const cashierB64 = toB64(cashierTicketText!);
 
             try {
               const payloadCashier = {
                 order_number: existingOrder.order_number,
-                pdf: cashierB64,
+                ticket: cashierB64,
                 nombre: updatedOrder?.nombre || existingOrder.nombre,
                 items: (updatedOrder?.items || existingOrder.items || []),
                 items_added: added,
@@ -399,7 +356,7 @@ Deno.serve(async (req) => {
               webhookErrors.push({ type: 'cashier', error: msg });
             }
           } catch (e) {
-            webhookErrors.push({ type: 'pdf', error: (e as Error).message });
+            webhookErrors.push({ type: 'ticket', error: (e as Error).message });
           }
 
           return new Response(
