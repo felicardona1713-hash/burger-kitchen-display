@@ -202,45 +202,81 @@ Deno.serve(async (req) => {
             return t;
           };
 
-          const generateTicketText = (type: 'kitchen' | 'cashier'): string | null => {
-            const lines: string[] = [];
-            const ESC = '\x1B';
-            const CENTER = `${ESC}a1`;
-            const LEFT = `${ESC}a0`;
-            const BOLD_ON = `${ESC}E1`;
-            const BOLD_OFF = `${ESC}E0`;
+          const generateTicketText = (type: 'kitchen' | 'cashier'): Uint8Array | null => {
+            const bytes: number[] = [];
             
-            const add = (text: string) => lines.push(text);
-            const addLine = () => lines.push('--------------------------------');
+            // ESC/POS commands
+            const ESC = 0x1B;
+            const GS = 0x1D;
+            const LF = 0x0A;
+            const CENTER = [ESC, 0x61, 0x01];
+            const LEFT = [ESC, 0x61, 0x00];
+            const BOLD_ON = [ESC, 0x45, 0x01];
+            const BOLD_OFF = [ESC, 0x45, 0x00];
+            const CUT = [GS, 0x56, 0x00];
+            
+            const addBytes = (...b: number[]) => bytes.push(...b);
+            const addText = (text: string) => {
+              const encoder = new TextEncoder();
+              addBytes(...Array.from(encoder.encode(text)));
+            };
+            const addLine = () => {
+              addText('--------------------------------');
+              addBytes(LF);
+            };
+            const newLine = () => addBytes(LF);
 
             if (type === 'kitchen') {
               if (hasItemChanges) {
-                add(`${CENTER}${BOLD_ON}COCINA${BOLD_OFF}`);
-                add(`${CENTER}MODIFICACION PEDIDO #${existingOrder.order_number}`);
-                add(`${LEFT}`);
+                addBytes(...CENTER, ...BOLD_ON);
+                addText('COCINA');
+                addBytes(...BOLD_OFF, LF);
+                addBytes(...CENTER);
+                addText(`MODIFICACION PEDIDO #${existingOrder.order_number}`);
+                addBytes(LF);
+                addBytes(...LEFT);
                 addLine();
                 
                 if (removed.length) {
-                  add(`${BOLD_ON}QUITAR:${BOLD_OFF}`);
-                  removed.forEach((it: any) => add(`- ${formatItem(it)}`));
-                  add('');
+                  addBytes(...BOLD_ON);
+                  addText('QUITAR:');
+                  addBytes(...BOLD_OFF, LF);
+                  removed.forEach((it: any) => {
+                    addText(`- ${formatItem(it)}`);
+                    newLine();
+                  });
+                  newLine();
                 }
                 if (added.length) {
-                  add(`${BOLD_ON}AGREGAR:${BOLD_OFF}`);
-                  added.forEach((it: any) => add(`+ ${formatItem(it)}`));
+                  addBytes(...BOLD_ON);
+                  addText('AGREGAR:');
+                  addBytes(...BOLD_OFF, LF);
+                  added.forEach((it: any) => {
+                    addText(`+ ${formatItem(it)}`);
+                    newLine();
+                  });
                 }
                 addLine();
+                addBytes(LF, LF, LF);
+                addBytes(...CUT);
               } else {
                 return null;
               }
             } else {
-              add(`${CENTER}${BOLD_ON}CAJA${BOLD_OFF}`);
-              add(`${CENTER}MODIFICACION PEDIDO #${existingOrder.order_number}`);
-              add(`${LEFT}`);
-              add(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`);
+              addBytes(...CENTER, ...BOLD_ON);
+              addText('CAJA');
+              addBytes(...BOLD_OFF, LF);
+              addBytes(...CENTER);
+              addText(`MODIFICACION PEDIDO #${existingOrder.order_number}`);
+              addBytes(LF);
+              addBytes(...LEFT);
+              addText(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`);
+              addBytes(LF);
               addLine();
               
-              add(`${BOLD_ON}PEDIDO COMPLETO:${BOLD_OFF}`);
+              addBytes(...BOLD_ON);
+              addText('PEDIDO COMPLETO:');
+              addBytes(...BOLD_OFF, LF);
               
               const finalItems = updatedOrder?.items || existingOrder.items || [];
               finalItems.forEach((item: any) => {
@@ -251,36 +287,49 @@ Deno.serve(async (req) => {
                 if (isAdded) itemText += ' (AGREGADA)';
                 if (isRemoved) itemText += ' (CANCELADA)';
                 
-                add(itemText);
+                addText(itemText);
+                newLine();
               });
               
-              add('');
+              newLine();
               const tel = updatedOrder?.telefono || existingOrder.telefono;
               const dir = updatedOrder?.direccion_envio || existingOrder.direccion_envio;
               const pago = updatedOrder?.metodo_pago || existingOrder.metodo_pago;
               
-              if (tel) add(`Tel: ${tel}`);
-              if (dir) add(`Domicilio: ${dir}${addressChanged ? ' (NUEVO)' : ''}`);
-              if (pago) add(`Pago: ${pago}${paymentChanged ? ' (NUEVO)' : ''}`);
+              if (tel) {
+                addText(`Tel: ${tel}`);
+                newLine();
+              }
+              if (dir) {
+                addText(`Domicilio: ${dir}${addressChanged ? ' (NUEVO)' : ''}`);
+                newLine();
+              }
+              if (pago) {
+                addText(`Pago: ${pago}${paymentChanged ? ' (NUEVO)' : ''}`);
+                newLine();
+              }
               addLine();
-              add(`${BOLD_ON}Monto: $${updatedOrder?.monto ?? existingOrder.monto}${BOLD_OFF}`);
+              addBytes(...BOLD_ON);
+              addText(`Monto: $${updatedOrder?.monto ?? existingOrder.monto}`);
+              addBytes(...BOLD_OFF, LF);
               addLine();
+              addBytes(LF, LF, LF);
+              addBytes(...CUT);
             }
 
-            add('\n\n\n');
-            return lines.join('\n');
+            return new Uint8Array(bytes);
           };
 
           // Generate tickets
           try {
-            const kitchenTicketText = generateTicketText('kitchen');
-            const cashierTicketText = generateTicketText('cashier');
+            const kitchenTicketBytes = generateTicketText('kitchen');
+            const cashierTicketBytes = generateTicketText('cashier');
 
-            const toB64 = (text: string) => btoa(unescape(encodeURIComponent(text)));
+            const toB64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 
             // Send kitchen webhook only if there are item changes
-            if (kitchenTicketText !== null) {
-              const kitchenB64 = toB64(kitchenTicketText);
+            if (kitchenTicketBytes !== null) {
+              const kitchenB64 = toB64(kitchenTicketBytes);
               try {
                 const payloadKitchen = {
                   order_number: existingOrder.order_number,
@@ -314,7 +363,7 @@ Deno.serve(async (req) => {
             }
 
             // Always send cashier webhook
-            const cashierB64 = toB64(cashierTicketText!);
+            const cashierB64 = toB64(cashierTicketBytes!);
 
             try {
               const payloadCashier = {
