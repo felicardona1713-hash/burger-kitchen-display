@@ -1,7 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1/dist/pdf-lib.esm.js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -125,91 +124,123 @@ serve(async (req) => {
     // Track webhook errors
     const webhookErrors = [];
     
-    // Helper function to generate PDF
-    const generatePDF = async (type: 'kitchen' | 'cashier') => {
-      const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([226, 400]); // 80mm width
-      const font = await pdfDoc.embedFont(StandardFonts.Courier);
+    // Helper function to generate ESC/POS ticket
+    const generateTicket = (type: 'kitchen' | 'cashier'): Uint8Array => {
+      const bytes: number[] = [];
       
-      const { width, height } = page.getSize();
-      let yPosition = height - 30;
-      const lineHeight = 12;
-      const margin = 10;
+      // ESC/POS commands
+      const ESC = 0x1B;
+      const GS = 0x1D;
+      const LF = 0x0A;
+      const CENTER = [ESC, 0x61, 0x01];
+      const LEFT = [ESC, 0x61, 0x00];
+      const BOLD_ON = [ESC, 0x45, 0x01];
+      const BOLD_OFF = [ESC, 0x45, 0x00];
+      const CUT = [GS, 0x56, 0x00];
       
-      // Helper function to add text lines
-      const addText = (text: string, size = 10, bold = false) => {
-        page.drawText(text, {
-          x: margin,
-          y: yPosition,
-          size,
-          font,
-          color: rgb(0, 0, 0),
-        });
-        yPosition -= lineHeight + (bold ? 2 : 0);
+      const addBytes = (...b: number[]) => bytes.push(...b);
+      const addText = (text: string) => {
+        const encoder = new TextEncoder();
+        addBytes(...Array.from(encoder.encode(text)));
       };
+      const addLine = () => {
+        addText('================================');
+        addBytes(LF);
+      };
+      const newLine = () => addBytes(LF);
       
       if (type === 'kitchen') {
-        // Kitchen PDF - Order items for preparation
-        addText('COCINA', 14, true);
-        addText('================================', 8);
-        addText(`PEDIDO #${data.order_number}`, 12, true);
-        addText('================================', 8);
+        // Kitchen ticket - Order items for preparation
+        addBytes(...CENTER, ...BOLD_ON);
+        addText('COCINA');
+        addBytes(...BOLD_OFF, LF);
+        addBytes(...LEFT);
+        addLine();
+        addBytes(...BOLD_ON);
+        addText(`PEDIDO #${data.order_number}`);
+        addBytes(...BOLD_OFF, LF);
+        addLine();
         
         // Print all items
         data.items.forEach((item: any) => {
           let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
           if (item.combo) itemDesc += ' (combo)';
-          addText(itemDesc, 10);
+          addText(itemDesc);
+          newLine();
           
           if (item.additions && item.additions.length > 0) {
-            addText(`  + ${item.additions.join(', ')}`, 8);
+            addText(`  + ${item.additions.join(', ')}`);
+            newLine();
           }
           if (item.removals && item.removals.length > 0) {
-            addText(`  - ${item.removals.join(', ')}`, 8);
+            addText(`  - ${item.removals.join(', ')}`);
+            newLine();
           }
         });
         
       } else {
-        // Cashier PDF - Complete order details
-        addText('CAJA', 14, true);
-        addText('================================', 8);
-        addText(`PEDIDO #${data.order_number}`, 12, true);
-        addText('================================', 8);
-        addText(`Cliente: ${data.nombre}`, 10);
-        if (data.telefono) addText(`Tel: ${data.telefono}`, 10);
-        if (data.direccion_envio) addText(`Entrega: ${data.direccion_envio}`, 10);
-        addText('--------------------------------', 8);
+        // Cashier ticket - Complete order details
+        addBytes(...CENTER, ...BOLD_ON);
+        addText('CAJA');
+        addBytes(...BOLD_OFF, LF);
+        addBytes(...LEFT);
+        addLine();
+        addBytes(...BOLD_ON);
+        addText(`PEDIDO #${data.order_number}`);
+        addBytes(...BOLD_OFF, LF);
+        addLine();
+        addText(`Cliente: ${data.nombre}`);
+        newLine();
+        if (data.telefono) {
+          addText(`Tel: ${data.telefono}`);
+          newLine();
+        }
+        if (data.direccion_envio) {
+          addText(`Entrega: ${data.direccion_envio}`);
+          newLine();
+        }
+        addText('--------------------------------');
+        newLine();
         
         // Print all items with prices
         data.items.forEach((item: any) => {
           let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
           if (item.combo) itemDesc += ' (combo)';
-          addText(itemDesc, 10);
+          addText(itemDesc);
+          newLine();
           
           if (item.additions && item.additions.length > 0) {
-            addText(`  + ${item.additions.join(', ')}`, 8);
+            addText(`  + ${item.additions.join(', ')}`);
+            newLine();
           }
           if (item.removals && item.removals.length > 0) {
-            addText(`  - ${item.removals.join(', ')}`, 8);
+            addText(`  - ${item.removals.join(', ')}`);
+            newLine();
           }
           if (item.price) {
-            addText(`  $${parseFloat(item.price).toLocaleString('es-AR')}`, 9);
+            addText(`  $${parseFloat(item.price).toLocaleString('es-AR')}`);
+            newLine();
           }
         });
         
-        addText('================================', 8);
-        addText(`TOTAL: $${parseFloat(data.monto).toLocaleString('es-AR')}`, 12, true);
-        addText(`Pago: ${data.metodo_pago}`, 10);
+        addLine();
+        addBytes(...BOLD_ON);
+        addText(`TOTAL: $${parseFloat(data.monto).toLocaleString('es-AR')}`);
+        addBytes(...BOLD_OFF, LF);
+        addText(`Pago: ${data.metodo_pago}`);
+        newLine();
       }
       
-      const pdfBytes = await pdfDoc.save();
-      return pdfBytes;
+      addBytes(LF, LF, LF);
+      addBytes(...CUT);
+      
+      return new Uint8Array(bytes);
     };
     
-    // Generate kitchen PDF
-    console.log('Generating kitchen PDF with order_number:', data.order_number);
-    const kitchenPdfBytes = await generatePDF('kitchen');
-    const kitchenPdfBase64 = btoa(String.fromCharCode(...new Uint8Array(kitchenPdfBytes)));
+    // Generate kitchen ticket
+    console.log('Generating kitchen ticket with order_number:', data.order_number);
+    const kitchenTicketBytes = generateTicket('kitchen');
+    const kitchenTicketBase64 = btoa(String.fromCharCode(...kitchenTicketBytes));
     
     // Send kitchen webhook
     try {
@@ -220,7 +251,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           order_number: data.order_number,
-          pdf: kitchenPdfBase64,
+          ticket: kitchenTicketBase64,
           items: data.items,
           nombre: data.nombre
         }),
@@ -237,33 +268,10 @@ serve(async (req) => {
       webhookErrors.push({ type: 'kitchen', error: error.message });
     }
     
-    // Generate cashier PDF
-    console.log('Generating cashier PDF with order_number:', data.order_number);
-    const cashierPdfBytes = await generatePDF('cashier');
-    
-    // Upload PDF to Supabase Storage
-    const pdfFileName = `invoice-${data.id}.pdf`;
-    const { error: uploadError } = await supabase
-      .storage
-      .from('invoices')
-      .upload(pdfFileName, cashierPdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true
-      });
-
-    if (uploadError) {
-      console.error('PDF upload error:', uploadError);
-    } else {
-      console.log('PDF uploaded successfully:', pdfFileName);
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase
-      .storage
-      .from('invoices')
-      .getPublicUrl(pdfFileName);
-
-    const cashierPdfBase64 = btoa(String.fromCharCode(...new Uint8Array(cashierPdfBytes)));
+    // Generate cashier ticket
+    console.log('Generating cashier ticket with order_number:', data.order_number);
+    const cashierTicketBytes = generateTicket('cashier');
+    const cashierTicketBase64 = btoa(String.fromCharCode(...cashierTicketBytes));
 
     // Send cashier webhook
     try {
@@ -274,8 +282,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           order_number: data.order_number,
-          pdf: cashierPdfBase64,
-          pdf_url: publicUrl,
+          ticket: cashierTicketBase64,
           nombre: data.nombre,
           telefono: data.telefono,
           monto: data.monto,
