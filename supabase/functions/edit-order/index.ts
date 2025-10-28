@@ -214,6 +214,7 @@ Deno.serve(async (req) => {
             const BOLD_ON = [ESC, 0x45, 0x01];
             const BOLD_OFF = [ESC, 0x45, 0x00];
             const DOUBLE_SIZE = [ESC, 0x21, 0x30]; // Double width and height
+            const MEDIUM_SIZE = [ESC, 0x21, 0x10]; // Double height only
             const NORMAL_SIZE = [ESC, 0x21, 0x00]; // Normal size
             const CUT = [GS, 0x56, 0x00];
             
@@ -228,12 +229,12 @@ Deno.serve(async (req) => {
             };
             const newLine = () => addBytes(LF);
             
-            // Initialize with center alignment and larger font
-            addBytes(...CENTER, ...DOUBLE_SIZE);
-
-            if (type === 'kitchen') {
+      // Initialize with center alignment
+      addBytes(...CENTER);
+      
+      if (type === 'kitchen') {
               if (hasItemChanges) {
-                addBytes(...BOLD_ON);
+                addBytes(...DOUBLE_SIZE, ...BOLD_ON);
                 addText('COCINA');
                 addBytes(...BOLD_OFF, LF);
                 newLine();
@@ -242,7 +243,7 @@ Deno.serve(async (req) => {
                 addLine();
                 addBytes(...BOLD_ON);
                 addText(`PEDIDO #${existingOrder.order_number}`);
-                addBytes(...BOLD_OFF, LF);
+                addBytes(...BOLD_OFF, LF, ...MEDIUM_SIZE);
                 addLine();
                 newLine();
                 
@@ -300,13 +301,13 @@ Deno.serve(async (req) => {
                     newLine();
                   });
                 }
-                addBytes(LF, LF, LF);
+                addBytes(LF, LF, LF, LF, LF);
                 addBytes(...CUT);
               } else {
                 return null;
               }
             } else {
-              addBytes(...BOLD_ON);
+              addBytes(...DOUBLE_SIZE, ...BOLD_ON);
               addText('CAJA');
               addBytes(...BOLD_OFF, LF);
               newLine();
@@ -315,7 +316,7 @@ Deno.serve(async (req) => {
               addLine();
               addBytes(...BOLD_ON);
               addText(`PEDIDO #${existingOrder.order_number}`);
-              addBytes(...BOLD_OFF, LF);
+              addBytes(...BOLD_OFF, LF, ...MEDIUM_SIZE);
               addLine();
               newLine();
               addText(`Cliente: ${updatedOrder?.nombre || existingOrder.nombre}`);
@@ -402,7 +403,7 @@ Deno.serve(async (req) => {
               newLine();
               addText(`$${(updatedOrder?.monto ?? existingOrder.monto).toLocaleString('es-AR')}`);
               addBytes(...BOLD_OFF, LF);
-              addBytes(LF, LF, LF);
+              addBytes(LF, LF, LF, LF, LF);
               addBytes(...CUT);
             }
 

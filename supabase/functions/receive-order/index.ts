@@ -137,6 +137,7 @@ serve(async (req) => {
       const BOLD_ON = [ESC, 0x45, 0x01];
       const BOLD_OFF = [ESC, 0x45, 0x00];
       const DOUBLE_SIZE = [ESC, 0x21, 0x30]; // Double width and height
+      const MEDIUM_SIZE = [ESC, 0x21, 0x10]; // Double height only
       const NORMAL_SIZE = [ESC, 0x21, 0x00]; // Normal size
       const CUT = [GS, 0x56, 0x00];
       
@@ -151,18 +152,18 @@ serve(async (req) => {
       };
       const newLine = () => addBytes(LF);
       
-      // Initialize with center alignment and larger font
-      addBytes(...CENTER, ...DOUBLE_SIZE);
+      // Initialize with center alignment
+      addBytes(...CENTER);
       
       if (type === 'kitchen') {
         // Kitchen ticket - Order items for preparation
-        addBytes(...BOLD_ON);
+        addBytes(...DOUBLE_SIZE, ...BOLD_ON);
         addText('COCINA');
         addBytes(...BOLD_OFF, LF);
         addLine();
         addBytes(...BOLD_ON);
         addText(`PEDIDO #${data.order_number}`);
-        addBytes(...BOLD_OFF, LF);
+        addBytes(...BOLD_OFF, LF, ...MEDIUM_SIZE);
         addLine();
         newLine();
         
@@ -194,13 +195,13 @@ serve(async (req) => {
         
       } else {
         // Cashier ticket - Complete order details
-        addBytes(...BOLD_ON);
+        addBytes(...DOUBLE_SIZE, ...BOLD_ON);
         addText('CAJA');
         addBytes(...BOLD_OFF, LF);
         addLine();
         addBytes(...BOLD_ON);
         addText(`PEDIDO #${data.order_number}`);
-        addBytes(...BOLD_OFF, LF);
+        addBytes(...BOLD_OFF, LF, ...MEDIUM_SIZE);
         addLine();
         newLine();
         addText(`Cliente: ${data.nombre}`);
@@ -260,7 +261,7 @@ serve(async (req) => {
         newLine();
       }
       
-      addBytes(LF, LF, LF);
+      addBytes(LF, LF, LF, LF, LF);
       addBytes(...CUT);
       
       return new Uint8Array(bytes);
