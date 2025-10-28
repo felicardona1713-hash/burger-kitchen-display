@@ -205,8 +205,8 @@ Deno.serve(async (req) => {
 
           const generatePDF = async (type: 'kitchen' | 'cashier') => {
             const pdfDoc = await PDFDocument.create();
-            const width = 226; // 80mm
-            const height = 850; // 300mm aprox
+            const width = 283; // 10cm
+            const height = 850; // 30cm aprox
             const margin = 10;
             const page = pdfDoc.addPage([width, height]);
             const font = await pdfDoc.embedFont(StandardFonts.Courier);
