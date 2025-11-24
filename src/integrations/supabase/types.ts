@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      bigpons: {
+        Row: {
+          created_at: string
+          direccion_envio: string | null
+          fecha: string
+          id: string
+          item_status: Json | null
+          items: Json | null
+          metodo_pago: string | null
+          monto: number
+          nombre: string
+          order_number: number
+          status: string
+          telefono: string | null
+        }
+        Insert: {
+          created_at?: string
+          direccion_envio?: string | null
+          fecha?: string
+          id?: string
+          item_status?: Json | null
+          items?: Json | null
+          metodo_pago?: string | null
+          monto: number
+          nombre: string
+          order_number: number
+          status?: string
+          telefono?: string | null
+        }
+        Update: {
+          created_at?: string
+          direccion_envio?: string | null
+          fecha?: string
+          id?: string
+          item_status?: Json | null
+          items?: Json | null
+          metodo_pago?: string | null
+          monto?: number
+          nombre?: string
+          order_number?: number
+          status?: string
+          telefono?: string | null
+        }
+        Relationships: []
+      }
       n8n_chat_histories: {
         Row: {
           id: number
@@ -101,6 +146,7 @@ export type Database = {
     }
     Functions: {
       get_daily_order_number: { Args: never; Returns: number }
+      get_daily_order_number_bigpons: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never
