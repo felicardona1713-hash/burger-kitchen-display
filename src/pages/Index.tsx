@@ -38,6 +38,7 @@ interface Order {
   direccion_envio?: string;
   order_number: number;
   metodo_pago?: string;
+  cadete_salio?: boolean;
 }
 
 const Index = () => {
@@ -258,6 +259,30 @@ const Index = () => {
       toast({
         title: "Pedido Completado",
         description: "El pedido ha sido marcado como listo"
+      });
+    }
+  };
+
+  const markCadeteSalio = async (orderId: string) => {
+    const { error } = await supabase
+      .from('orders')
+      .update({ cadete_salio: true })
+      .eq('id', orderId);
+
+    if (error) {
+      console.error('Error updating cadete status:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo marcar que el cadete salió",
+        variant: "destructive"
+      });
+    } else {
+      setPendingOrders(prev => prev.map(o => 
+        o.id === orderId ? { ...o, cadete_salio: true } : o
+      ));
+      toast({
+        title: "Cadete en camino",
+        description: "El cadete ha salido con el pedido",
       });
     }
   };
@@ -1048,14 +1073,34 @@ const Index = () => {
           </div>
 
           {showCompleteButton && (
-            <Button 
-              onClick={() => markAsCompleted(order.id)}
-              className="w-full bg-success hover:bg-success/90 text-success-foreground"
-              size="lg"
-            >
-              <Check className="w-4 h-4 mr-2" />
-              Hecho
-            </Button>
+            <div className="space-y-2">
+              {order.direccion_envio && order.direccion_envio.toLowerCase() !== 'retiro por local' && (
+                <>
+                  {order.cadete_salio ? (
+                    <Badge variant="default" className="w-full py-2 justify-center">
+                      🚴 Cadete en camino
+                    </Badge>
+                  ) : (
+                    <Button 
+                      onClick={() => markCadeteSalio(order.id)}
+                      variant="outline"
+                      className="w-full"
+                      size="lg"
+                    >
+                      🚴 Cadete Salió
+                    </Button>
+                  )}
+                </>
+              )}
+              <Button 
+                onClick={() => markAsCompleted(order.id)}
+                className="w-full bg-success hover:bg-success/90 text-success-foreground"
+                size="lg"
+              >
+                <Check className="w-4 h-4 mr-2" />
+                Hecho
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

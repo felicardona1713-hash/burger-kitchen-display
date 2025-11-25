@@ -37,6 +37,7 @@ interface Order {
   item_status?: ItemStatus[];
   direccion_envio?: string;
   metodo_pago?: string;
+  cadete_salio?: boolean;
 }
 
 const Kitchen = () => {
@@ -198,6 +199,30 @@ const Kitchen = () => {
     }
   };
 
+  const markCadeteSalio = async (orderId: string) => {
+    const { error } = await supabase
+      .from('orders')
+      .update({ cadete_salio: true })
+      .eq('id', orderId);
+
+    if (error) {
+      console.error('Error updating cadete status:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo marcar que el cadete salió",
+        variant: "destructive"
+      });
+    } else {
+      setOrders(prev => prev.map(o => 
+        o.id === orderId ? { ...o, cadete_salio: true } : o
+      ));
+      toast({
+        title: "Cadete en camino",
+        description: "El cadete ha salido con el pedido",
+      });
+    }
+  };
+
   const getOrderAge = (createdAt: string) => {
     const now = new Date();
     const orderTime = new Date(createdAt);
@@ -355,14 +380,34 @@ const Kitchen = () => {
                        })}
                      </div>
 
-                    <Button 
-                      onClick={() => markAsCompleted(order.id)}
-                      className="w-full bg-success hover:bg-success/90 text-success-foreground"
-                      size="lg"
-                    >
-                      <Check className="w-4 h-4 mr-2" />
-                      Marcar como Listo
-                    </Button>
+                    <div className="space-y-2">
+                      {order.direccion_envio && order.direccion_envio.toLowerCase() !== 'retiro por local' && (
+                        <>
+                          {order.cadete_salio ? (
+                            <Badge variant="default" className="w-full py-2 justify-center">
+                              🚴 Cadete en camino
+                            </Badge>
+                          ) : (
+                            <Button 
+                              onClick={() => markCadeteSalio(order.id)}
+                              variant="outline"
+                              className="w-full"
+                              size="lg"
+                            >
+                              🚴 Cadete Salió
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      <Button 
+                        onClick={() => markAsCompleted(order.id)}
+                        className="w-full bg-success hover:bg-success/90 text-success-foreground"
+                        size="lg"
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        Marcar como Listo
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );

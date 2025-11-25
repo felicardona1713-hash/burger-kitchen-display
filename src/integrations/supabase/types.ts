@@ -97,6 +97,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          cadete_salio: boolean | null
           created_at: string
           direccion_envio: string | null
           fecha: string
@@ -111,6 +112,7 @@ export type Database = {
           telefono: string | null
         }
         Insert: {
+          cadete_salio?: boolean | null
           created_at?: string
           direccion_envio?: string | null
           fecha?: string
@@ -125,6 +127,7 @@ export type Database = {
           telefono?: string | null
         }
         Update: {
+          cadete_salio?: boolean | null
           created_at?: string
           direccion_envio?: string | null
           fecha?: string
