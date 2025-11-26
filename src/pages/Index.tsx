@@ -264,6 +264,133 @@ const Index = () => {
     }
   };
 
+  const reprintTicket = async (order: Order) => {
+    try {
+      // Generate ESC/POS ticket for cashier
+      const generateCashierTicket = (): Uint8Array => {
+        const bytes: number[] = [];
+        
+        // ESC/POS commands
+        const ESC = 0x1B;
+        const GS = 0x1D;
+        const LF = 0x0A;
+        const CENTER = [ESC, 0x61, 0x01];
+        const BOLD_ON = [ESC, 0x45, 0x01];
+        const BOLD_OFF = [ESC, 0x45, 0x00];
+        const DOUBLE_SIZE = [ESC, 0x21, 0x30];
+        const MEDIUM_SIZE = [ESC, 0x21, 0x10];
+        const CUT = [GS, 0x56, 0x00];
+        
+        const addBytes = (...b: number[]) => bytes.push(...b);
+        const addText = (text: string) => {
+          const encoder = new TextEncoder();
+          addBytes(...Array.from(encoder.encode(text)));
+        };
+        const addLine = () => {
+          addText('================================');
+          addBytes(LF);
+        };
+        const newLine = () => addBytes(LF);
+        
+        addBytes(...CENTER);
+        addBytes(...DOUBLE_SIZE, ...BOLD_ON);
+        addText('CAJA');
+        addBytes(...BOLD_OFF, LF);
+        addLine();
+        addBytes(...BOLD_ON);
+        addText(`PEDIDO #${order.order_number}`);
+        addBytes(...BOLD_OFF, LF, ...MEDIUM_SIZE);
+        addLine();
+        newLine();
+        addText(`Cliente: ${order.nombre}`);
+        newLine();
+        if (order.direccion_envio) {
+          newLine();
+          addText(`Entrega:`);
+          newLine();
+          addText(`${order.direccion_envio}`);
+          newLine();
+        }
+        newLine();
+        addLine();
+        newLine();
+        
+        if (order.items) {
+          order.items.forEach((item: OrderItem) => {
+            let itemDesc = `${item.quantity}x ${item.burger_type} ${item.patty_size}`;
+            if (item.combo) {
+              itemDesc += ' (combo)';
+            }
+            newLine();
+            addText(itemDesc);
+            newLine();
+            
+            if (item.additions && item.additions.length > 0) {
+              addText(`+ ${item.additions.join(', ')}`);
+              newLine();
+            }
+            if (item.removals && item.removals.length > 0) {
+              addText(`- ${item.removals.join(', ')}`);
+              newLine();
+            }
+          });
+        }
+        
+        addLine();
+        newLine();
+        addBytes(...BOLD_ON);
+        addText(`TOTAL: $${parseFloat(order.monto.toString()).toLocaleString('es-AR')}`);
+        addBytes(...BOLD_OFF, LF);
+        newLine();
+        addText(`Pago: ${order.metodo_pago || 'efectivo'}`);
+        newLine();
+        
+        addBytes(LF, LF, LF, LF, LF);
+        addBytes(...CUT);
+        
+        return new Uint8Array(bytes);
+      };
+
+      const ticketBytes = generateCashierTicket();
+      const ticketBase64 = btoa(String.fromCharCode(...ticketBytes));
+
+      // Send to cashier webhook only
+      const cashierWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCaja';
+      
+      const response = await fetch(cashierWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_number: order.order_number,
+          ticket: ticketBase64,
+          nombre: order.nombre,
+          monto: order.monto,
+          metodo_pago: order.metodo_pago,
+          items: order.items,
+          direccion_envio: order.direccion_envio
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error al reimprimir: ${response.status}`);
+      }
+
+      toast({
+        title: "Ticket reimpreso",
+        description: `Pedido #${order.order_number} enviado a impresora de caja`,
+      });
+    } catch (error) {
+      console.error('Error reprinting ticket:', error);
+      toast({
+        title: "Error al reimprimir",
+        description: "No se pudo reimprimir el ticket",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getOrderAge = (createdAt: string) => {
     const now = new Date();
     const orderTime = new Date(createdAt);
@@ -609,6 +736,18 @@ const Index = () => {
                 Hecho
               </Button>
             </div>
+          )}
+          
+          {order.id && (
+            <Button 
+              onClick={() => reprintTicket(order)}
+              variant="outline"
+              className="w-full"
+              size="lg"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Reimprimir ticket
+            </Button>
           )}
         </CardContent>
       </Card>
