@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistance } from "date-fns";
 import { es } from "date-fns/locale";
 import { Check, Clock, DollarSign, ChefHat, Printer } from "lucide-react";
-import Navbar from "@/components/Navbar";
 
 interface OrderItem {
   quantity: number;
@@ -617,9 +616,7 @@ const Index = () => {
   };
 
   return (
-    <>
-      <Navbar />
-      <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-background p-4">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-4 mb-4">
@@ -703,7 +700,6 @@ const Index = () => {
         </Tabs>
       </div>
     </div>
-    </>
   );
 };
 
