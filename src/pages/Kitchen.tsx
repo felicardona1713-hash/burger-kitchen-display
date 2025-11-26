@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistance } from "date-fns";
 import { es } from "date-fns/locale";
 import { Check, Clock, DollarSign } from "lucide-react";
+import Navbar from "@/components/Navbar";
 
 interface OrderItem {
   quantity: number;
@@ -235,7 +236,9 @@ const Kitchen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <>
+      <Navbar />
+      <div className="min-h-screen bg-background p-4">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-4xl font-bold text-foreground mb-2">
@@ -416,6 +419,7 @@ const Kitchen = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 
