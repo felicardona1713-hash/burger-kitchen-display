@@ -1,11 +1,56 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { PDFDocument, rgb, StandardFonts } from 'https://esm.sh/pdf-lib@1.17.1/dist/pdf-lib.esm.js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// ESC/POS Commands
+const ESC = '\x1B';
+const GS = '\x1D';
+const BOLD_ON = ESC + 'E' + '\x01';
+const BOLD_OFF = ESC + 'E' + '\x00';
+const DOUBLE_HEIGHT_ON = GS + '!' + '\x10';
+const DOUBLE_WIDTH_ON = GS + '!' + '\x20';
+const DOUBLE_SIZE_ON = GS + '!' + '\x30';
+const NORMAL_SIZE = GS + '!' + '\x00';
+const CENTER = ESC + 'a' + '\x01';
+const LEFT = ESC + 'a' + '\x00';
+const CUT = GS + 'V' + '\x00';
+
+function generateCancelTicket(type: 'kitchen' | 'cashier', orderNumber: number, nombre: string): string {
+  let ticket = '';
+  
+  // Header
+  ticket += CENTER;
+  ticket += BOLD_ON + DOUBLE_SIZE_ON;
+  ticket += type === 'kitchen' ? 'COCINA\n' : 'CAJA\n';
+  ticket += NORMAL_SIZE + BOLD_OFF;
+  ticket += '\n';
+  
+  // Order number
+  ticket += BOLD_ON + DOUBLE_SIZE_ON;
+  ticket += `PEDIDO #${orderNumber}\n`;
+  ticket += NORMAL_SIZE + BOLD_OFF;
+  ticket += '\n';
+  
+  // CANCELADO in big letters
+  ticket += BOLD_ON + DOUBLE_SIZE_ON;
+  ticket += '*** CANCELADO ***\n';
+  ticket += NORMAL_SIZE + BOLD_OFF;
+  ticket += '\n';
+  
+  // Customer name
+  ticket += LEFT;
+  ticket += `Cliente: ${nombre}\n`;
+  ticket += '\n\n\n\n';
+  
+  // Cut
+  ticket += CUT;
+  
+  return ticket;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -84,33 +129,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate cancellation PDFs and notify printers
+    // Generate cancellation ESC/POS tickets and notify printers
     const kitchenWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCocina';
     const cashierWebhookUrl = 'https://n8nwebhookx.botec.tech/webhook/crearFacturaCaja';
 
-    const generateCancelPDF = async (type: 'kitchen' | 'cashier') => {
-      const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([226, 200]);
-      const font = await pdfDoc.embedFont(StandardFonts.Courier);
-      let y = 180;
-      const line = 12;
-      const add = (t: string, s = 12, e = 0) => { page.drawText(t, { x: 10, y, size: s, font, color: rgb(0,0,0) }); y -= line + e; };
-      add(type === 'kitchen' ? 'COCINA' : 'CAJA', 12, 2);
-      add(`PEDIDO #${existingOrder.order_number}`, 14, 2);
-      add('CANCELADO', 16, 4);
-      add(`Cliente: ${existingOrder.nombre}`, 10);
-      return await pdfDoc.save();
-    };
-
     try {
-      const k = await generateCancelPDF('kitchen');
-      const c = await generateCancelPDF('cashier');
-      const toB64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
-      const kitchenB64 = toB64(k);
-      const cashierB64 = toB64(c);
+      const kitchenTicket = generateCancelTicket('kitchen', existingOrder.order_number, existingOrder.nombre);
+      const cashierTicket = generateCancelTicket('cashier', existingOrder.order_number, existingOrder.nombre);
+      
+      // Convert to base64
+      const kitchenB64 = btoa(kitchenTicket);
+      const cashierB64 = btoa(cashierTicket);
 
-      await fetch(kitchenWebhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_number, pdf: kitchenB64, nombre: existingOrder.nombre }) });
-      await fetch(cashierWebhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_number, pdf: cashierB64, nombre: existingOrder.nombre }) });
+      console.log('Sending cancellation tickets to printers...');
+
+      const kitchenPromise = fetch(kitchenWebhookUrl, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ order_number, ticket: kitchenB64, nombre: existingOrder.nombre, type: 'cancel' }) 
+      });
+      
+      const cashierPromise = fetch(cashierWebhookUrl, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ order_number, ticket: cashierB64, nombre: existingOrder.nombre, type: 'cancel' }) 
+      });
+
+      const [kitchenRes, cashierRes] = await Promise.all([kitchenPromise, cashierPromise]);
+      
+      console.log('Kitchen webhook response:', kitchenRes.status);
+      console.log('Cashier webhook response:', cashierRes.status);
     } catch (e) {
       console.error('Cancel print error:', e);
     }
